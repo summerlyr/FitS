@@ -58,6 +58,72 @@ final class FavoritesStore: ObservableObject {
     }
 }
 
+struct TrainingEntry: Codable, Identifiable, Hashable {
+    let id: UUID
+    let exerciseID: String
+    let exerciseName: String
+    let date: Date
+    let notes: String
+}
+
+@MainActor
+final class TrainingStore: ObservableObject {
+    @Published private(set) var entries: [TrainingEntry]
+
+    private let defaultsKey = "trainingEntries"
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: defaultsKey),
+           let savedEntries = try? JSONDecoder().decode([TrainingEntry].self, from: data) {
+            entries = savedEntries.sorted { $0.date > $1.date }
+        } else {
+            entries = []
+        }
+    }
+
+    func add(_ exercise: Exercise, notes: String, date: Date = .now) {
+        entries.insert(
+            TrainingEntry(
+                id: UUID(),
+                exerciseID: exercise.id,
+                exerciseName: exercise.localizedName,
+                date: date,
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            ),
+            at: 0
+        )
+        save()
+    }
+
+    func update(_ entry: TrainingEntry, date: Date, notes: String) {
+        guard let index = entries.firstIndex(where: { $0.id == entry.id }) else {
+            return
+        }
+
+        entries[index] = TrainingEntry(
+            id: entry.id,
+            exerciseID: entry.exerciseID,
+            exerciseName: entry.exerciseName,
+            date: date,
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+        entries.sort { $0.date > $1.date }
+        save()
+    }
+
+    func delete(_ entry: TrainingEntry) {
+        entries.removeAll { $0.id == entry.id }
+        save()
+    }
+
+    private func save() {
+        guard let data = try? JSONEncoder().encode(entries) else {
+            return
+        }
+        UserDefaults.standard.set(data, forKey: defaultsKey)
+    }
+}
+
 private enum DatasetError: LocalizedError {
     case missingFile
 

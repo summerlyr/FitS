@@ -147,6 +147,7 @@
 				DEVELOPMENT_TEAM = RJZZ47FLT6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = FitS;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "用于将动作详情长图存储到照片";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
@@ -232,6 +233,7 @@
 				DEVELOPMENT_TEAM = RJZZ47FLT6;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = FitS;
+				INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription = "用于将动作详情长图存储到照片";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
