@@ -1,13 +1,17 @@
 <p align="center">
-  <img src="ExerciseFinder/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png" width="120" alt="FitS app icon">
+  <img src="ExerciseFinder/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png" width="120" alt="FitS App 图标">
 </p>
 
 <h1 align="center">FitS</h1>
 
 <p align="center">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2017%2B-0A84FF">
+  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a>
+</p>
+
+<p align="center">
+  <img alt="平台" src="https://img.shields.io/badge/platform-iOS%2017%2B-0A84FF">
   <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-35C3D6">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-34C759"></a>
+  <a href="LICENSE"><img alt="许可证" src="https://img.shields.io/badge/license-MIT-34C759"></a>
 </p>
 
 FitS 是一个使用 SwiftUI 构建的本地健身动作浏览和训练记录 App。它提供中英文动作信息、专业术语搜索、收藏、替代动作推荐，以及按日期组织的个人训练记录。
@@ -24,6 +28,14 @@ FitS 是一个使用 SwiftUI 构建的本地健身动作浏览和训练记录 Ap
 - 按日期记录训练动作、重量、次数和组数等自由文本备注
 - 为一次训练添加图片，复制整次训练，或整体修改训练日期
 - 将动作详情导出为长图并通过系统分享面板发送或保存
+
+## 截图
+
+| 动作浏览 | 动作详情 |
+|:---:|:---:|
+| <img src="docs/screenshots/actions.png" width="280" alt="动作浏览"> | <img src="docs/screenshots/exercise-detail.png" width="280" alt="动作详情"> |
+| **替代动作** | **训练记录** |
+| <img src="docs/screenshots/alternatives.png" width="280" alt="替代动作"> | <img src="docs/screenshots/training-records.png" width="280" alt="训练记录"> |
 
 ## 系统要求
 
@@ -54,7 +66,7 @@ FitS 不需要账户，当前也不向服务器上传训练数据。收藏、训
 
 ## 参与贡献
 
-欢迎提交 bug、翻译修正、搜索同义词和小范围功能改进。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请按照 [SECURITY.md](SECURITY.md) 私下报告。
+欢迎提交 Bug、翻译修正、搜索同义词和小范围功能改进。请先阅读 [CONTRIBUTING.md](CONTRIBUTING.md)。安全问题请按照 [SECURITY.md](SECURITY.md) 私下报告。
 
 ## License
 
