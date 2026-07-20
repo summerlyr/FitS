@@ -5,8 +5,13 @@ struct ExerciseDetailView: View {
     let exercise: Exercise
     @EnvironmentObject private var store: ExerciseStore
     @EnvironmentObject private var favorites: FavoritesStore
-    @State private var language = DetailLanguage.chinese
+    @State private var language: DetailLanguage
     @State private var shareImage: UIImage?
+
+    init(exercise: Exercise) {
+        self.exercise = exercise
+        _language = State(initialValue: L10n.prefersEnglish ? .english : .chinese)
+    }
 
     var body: some View {
         ScrollView {
@@ -18,7 +23,7 @@ struct ExerciseDetailView: View {
                     .accessibilityAddTraits(.isHeader)
 
                 Picker("语言 / Language", selection: $language) {
-                    ForEach(DetailLanguage.allCases) { language in
+                    ForEach(detailLanguages) { language in
                         Text(language.title).tag(language)
                     }
                 }
@@ -115,13 +120,19 @@ struct ExerciseDetailView: View {
                     Image(systemName: favorites.contains(exercise) ? "heart.fill" : "heart")
                         .foregroundStyle(favorites.contains(exercise) ? Color.red : Color.secondary)
                 }
-                .accessibilityLabel(favorites.contains(exercise) ? "取消收藏" : "收藏")
+                .accessibilityLabel(
+                    L10n.string(favorites.contains(exercise) ? "取消收藏" : "收藏")
+                )
             }
         }
     }
 
     private var name: String {
-        language == .chinese ? exercise.localizedName : exercise.name.capitalized
+        language == .chinese ? exercise.chineseName : exercise.name.capitalized
+    }
+
+    private var detailLanguages: [DetailLanguage] {
+        L10n.prefersEnglish ? [.english, .chinese] : [.chinese, .english]
     }
 
     private var instructions: [String] {
@@ -193,7 +204,7 @@ struct ExerciseDetailView: View {
     ]
 
     private func value(_ value: String) -> String {
-        language == .chinese ? ExerciseTerms.localized(value) : value.capitalized
+        language == .chinese ? ExerciseTerms.localizedChinese(value) : value.capitalized
     }
 
     @MainActor
@@ -305,18 +316,18 @@ private struct AlternativeExerciseRow: View {
     }
 
     private var name: String {
-        language == .chinese ? exercise.localizedName : exercise.name.capitalized
+        language == .chinese ? exercise.chineseName : exercise.name.capitalized
     }
 
     private var equipment: String {
         language == .chinese
-            ? ExerciseTerms.localized(exercise.equipment)
+            ? ExerciseTerms.localizedChinese(exercise.equipment)
             : exercise.equipment.capitalized
     }
 
     private var target: String {
         let value = language == .chinese
-            ? ExerciseTerms.localized(exercise.target)
+            ? ExerciseTerms.localizedChinese(exercise.target)
             : exercise.target.capitalized
         let separator = language == .chinese ? "：" : ": "
         return "\(language.targetTitle)\(separator)\(value)"
@@ -328,7 +339,7 @@ private struct ExerciseShareCard: View {
     let language: DetailLanguage
 
     private var name: String {
-        language == .chinese ? exercise.localizedName : exercise.name.capitalized
+        language == .chinese ? exercise.chineseName : exercise.name.capitalized
     }
 
     private var instructions: [String] {
@@ -395,7 +406,7 @@ private struct ExerciseShareCard: View {
     }
 
     private func value(_ value: String) -> String {
-        language == .chinese ? ExerciseTerms.localized(value) : value.capitalized
+        language == .chinese ? ExerciseTerms.localizedChinese(value) : value.capitalized
     }
 }
 

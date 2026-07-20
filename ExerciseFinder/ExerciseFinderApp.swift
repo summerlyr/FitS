@@ -5,17 +5,23 @@ struct ExerciseFinderApp: App {
     @StateObject private var store = ExerciseStore()
     @StateObject private var favorites = FavoritesStore()
     @StateObject private var training = TrainingStore()
+    @StateObject private var language = LanguageStore()
     @State private var selectedBodyPart = "全部部位"
     @State private var selectedEquipment = "全部器械"
     @State private var favoriteBodyPart = "全部部位"
     @State private var favoriteEquipment = "全部器械"
+    @State private var selectedTab = AppTab.favorites
 
     var body: some Scene {
         WindowGroup {
             Group {
                 if #available(iOS 18.0, *) {
-                    TabView {
-                        Tab("动作", systemImage: "figure.strengthtraining.traditional") {
+                    TabView(selection: $selectedTab) {
+                        Tab(
+                            "动作",
+                            systemImage: "figure.strengthtraining.traditional",
+                            value: AppTab.exercises
+                        ) {
                             exerciseList(
                                 searchEnabled: false,
                                 favoritesOnly: false,
@@ -24,7 +30,7 @@ struct ExerciseFinderApp: App {
                             )
                         }
 
-                        Tab("收藏", systemImage: "heart") {
+                        Tab("收藏", systemImage: "heart", value: AppTab.favorites) {
                             exerciseList(
                                 searchEnabled: false,
                                 favoritesOnly: true,
@@ -33,11 +39,11 @@ struct ExerciseFinderApp: App {
                             )
                         }
 
-                        Tab("训练", systemImage: "calendar") {
+                        Tab("训练", systemImage: "calendar", value: AppTab.training) {
                             TrainingView()
                         }
 
-                        Tab(role: .search) {
+                        Tab(value: AppTab.search, role: .search) {
                             exerciseList(
                                 searchEnabled: true,
                                 favoritesOnly: false,
@@ -47,7 +53,7 @@ struct ExerciseFinderApp: App {
                         }
                     }
                 } else {
-                    TabView {
+                    TabView(selection: $selectedTab) {
                         exerciseList(
                             searchEnabled: true,
                             favoritesOnly: false,
@@ -57,6 +63,7 @@ struct ExerciseFinderApp: App {
                             .tabItem {
                                 Label("动作", systemImage: "figure.strengthtraining.traditional")
                             }
+                            .tag(AppTab.exercises)
 
                         exerciseList(
                             searchEnabled: true,
@@ -67,17 +74,22 @@ struct ExerciseFinderApp: App {
                             .tabItem {
                                 Label("收藏", systemImage: "heart")
                             }
+                            .tag(AppTab.favorites)
 
                         TrainingView()
                             .tabItem {
                                 Label("训练", systemImage: "calendar")
                             }
+                            .tag(AppTab.training)
                     }
                 }
             }
             .environmentObject(store)
             .environmentObject(favorites)
             .environmentObject(training)
+            .environmentObject(language)
+            .environment(\.locale, language.language.locale)
+            .id(language.language.rawValue)
         }
     }
 
@@ -94,4 +106,11 @@ struct ExerciseFinderApp: App {
             showsFavoritesOnly: favoritesOnly
         )
     }
+}
+
+private enum AppTab: Hashable {
+    case exercises
+    case favorites
+    case training
+    case search
 }

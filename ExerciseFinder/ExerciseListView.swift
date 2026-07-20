@@ -58,7 +58,12 @@ struct ExerciseListView: View {
                     exerciseContent
                 }
             }
-            .navigationTitle(showsFavoritesOnly ? "我的收藏" : "训练动作")
+            .navigationTitle(L10n.string(showsFavoritesOnly ? "我的收藏" : "训练动作"))
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    AppLanguageButton()
+                }
+            }
         }
         .task {
             await store.load()
@@ -98,7 +103,7 @@ struct ExerciseListView: View {
                             favorites.toggle(exercise)
                         } label: {
                             Label(
-                                favorites.contains(exercise) ? "取消收藏" : "收藏",
+                                L10n.string(favorites.contains(exercise) ? "取消收藏" : "收藏"),
                                 systemImage: favorites.contains(exercise) ? "heart.fill" : "heart"
                             )
                         }
@@ -120,17 +125,17 @@ struct ExerciseListView: View {
     private var emptyStateDescription: String {
         if showsFavoritesOnly {
             return hasActiveFilters
-                ? "当前筛选条件下没有收藏动作。"
-                : "收藏动作后，它们会显示在这里。"
+                ? L10n.string("当前筛选条件下没有收藏动作。")
+                : L10n.string("收藏动作后，它们会显示在这里。")
         }
         if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "当前筛选条件下没有匹配的动作。"
+            return L10n.string("当前筛选条件下没有匹配的动作。")
         }
-        return "没有找到与“\(searchText)”匹配的动作，请尝试其他关键词。"
+        return L10n.format("没有找到与“%@”匹配的动作，请尝试其他关键词。", searchText)
     }
 
     private var filterBar: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             FilterMenu(
                 title: selectedBodyPart,
                 systemImage: "figure.strengthtraining.traditional",
@@ -150,7 +155,8 @@ struct ExerciseListView: View {
             Text("\(filteredExercises.count)")
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
-                .frame(width: 36, alignment: .trailing)
+                .lineLimit(1)
+                .frame(width: 40, alignment: .trailing)
 
             Button {
                 clearFilters()
@@ -161,14 +167,14 @@ struct ExerciseListView: View {
             .buttonStyle(.plain)
             .foregroundStyle(hasActiveFilters ? Color.accentColor : Color.secondary.opacity(0.45))
             .disabled(!hasActiveFilters)
-            .accessibilityLabel("清除筛选")
+            .accessibilityLabel(L10n.string("清除筛选"))
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
     }
 
     private var emptyStateTitle: String {
-        showsFavoritesOnly ? "暂无收藏" : "未找到动作"
+        L10n.string(showsFavoritesOnly ? "暂无收藏" : "未找到动作")
     }
 
     private var hasActiveFilters: Bool {
@@ -222,14 +228,7 @@ private struct AddTrainingEntrySheet: View {
                 }
 
                 Section("训练日期") {
-                    Text(Date.now.formatted(
-                        .dateTime
-                            .year()
-                            .month()
-                            .day()
-                            .weekday()
-                            .locale(Locale(identifier: "zh_CN"))
-                    ))
+                    Text(L10n.formattedDate(.now))
                 }
             }
             .navigationTitle("加入今日训练")
@@ -302,6 +301,11 @@ struct TrainingView: View {
                 }
             }
             .navigationTitle("训练记录")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    AppLanguageButton()
+                }
+            }
         }
         .task {
             await store.load()
@@ -319,10 +323,12 @@ struct TrainingView: View {
                 sessionDateToDelete = nil
             }
         } message: { date in
-            Text(
-                "将删除 \(formattedDate(date)) 的 \(entries(on: date).count) 个动作"
-                    + "和 \(training.photos(on: date).count) 张图片，此操作无法恢复。"
-            )
+            Text(L10n.format(
+                "将删除 %@ 的 %ld 个动作和 %ld 张图片，此操作无法恢复。",
+                formattedDate(date),
+                entries(on: date).count,
+                training.photos(on: date).count
+            ))
         }
     }
 
@@ -333,14 +339,7 @@ struct TrainingView: View {
     }
 
     private func formattedDate(_ date: Date) -> String {
-        date.formatted(
-            .dateTime
-                .year()
-                .month()
-                .day()
-                .weekday()
-                .locale(Locale(identifier: "zh_CN"))
-        )
+        L10n.formattedDate(date)
     }
 }
 
@@ -356,10 +355,13 @@ private struct TrainingSessionRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
-                Label("\(entries.count) 个动作", systemImage: "figure.strengthtraining.traditional")
+                Label(
+                    L10n.format("%ld 个动作", entries.count),
+                    systemImage: "figure.strengthtraining.traditional"
+                )
 
                 if photoCount > 0 {
-                    Label("\(photoCount) 张图片", systemImage: "photo")
+                    Label(L10n.format("%ld 张图片", photoCount), systemImage: "photo")
                 }
             }
             .font(.subheadline)
@@ -370,7 +372,7 @@ private struct TrainingSessionRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
-                Text(muscles.isEmpty ? "暂无肌群信息" : shortMuscleSummary)
+                Text(muscles.isEmpty ? L10n.string("暂无肌群信息") : shortMuscleSummary)
                     .font(.headline)
                     .foregroundStyle(.primary)
                     .lineLimit(2)
@@ -380,9 +382,11 @@ private struct TrainingSessionRow: View {
     }
 
     private var shortMuscleSummary: String {
-        let visibleMuscles = muscles.prefix(3).map(\.name).joined(separator: "、")
+        let visibleMuscles = muscles.prefix(3).map(\.name).joined(separator: L10n.listSeparator)
         let remainingCount = max(0, muscles.count - 3)
-        return remainingCount > 0 ? "\(visibleMuscles) 等 \(muscles.count) 个肌群" : visibleMuscles
+        return remainingCount > 0
+            ? L10n.format("%@ 等 %ld 个肌群", visibleMuscles, muscles.count)
+            : visibleMuscles
     }
 }
 
@@ -424,8 +428,7 @@ private struct TrainingSessionDetailView: View {
                     selection: sessionDate,
                     displayedComponents: .date
                 )
-                .environment(\.locale, Locale(identifier: "zh_CN"))
-                LabeledContent("动作数量", value: "\(entries.count) 个")
+                LabeledContent("动作数量", value: L10n.format("%ld 个", entries.count))
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("主要肌群")
@@ -483,7 +486,7 @@ private struct TrainingSessionDetailView: View {
                     } label: {
                         Image(systemName: "square.on.square")
                     }
-                    .accessibilityLabel("将整次训练复制到今天")
+                    .accessibilityLabel(L10n.string("将整次训练复制到今天"))
                 }
             }
 
@@ -498,7 +501,7 @@ private struct TrainingSessionDetailView: View {
                     ) {
                         Image(systemName: "photo.badge.plus")
                     }
-                    .accessibilityLabel("为这次训练添加图片")
+                    .accessibilityLabel(L10n.string("为这次训练添加图片"))
                 }
             }
         }
@@ -533,7 +536,7 @@ private struct TrainingSessionDetailView: View {
         .alert("已复制到今天", isPresented: $isShowingCopyConfirmation) {
             Button("好", role: .cancel) {}
         } message: {
-            Text("已复制 \(copiedEntryCount) 个训练动作，原有备注也已保留。")
+            Text(L10n.format("已复制 %ld 个训练动作，原有备注也已保留。", copiedEntryCount))
         }
         .alert("部分图片无法添加", isPresented: $isShowingImportError) {
             Button("好", role: .cancel) {}
@@ -553,7 +556,10 @@ private struct TrainingSessionDetailView: View {
                 entryToDelete = nil
             }
         } message: { entry in
-            Text("将删除“\(entry.exerciseName)”这条训练记录。")
+            Text(L10n.format(
+                "将删除“%@”这条训练记录。",
+                exercise(for: entry)?.localizedName ?? entry.exerciseName
+            ))
         }
     }
 
@@ -573,12 +579,12 @@ private struct TrainingSessionDetailView: View {
 
     private var detailedMuscleSummary: String {
         guard !muscles.isEmpty else {
-            return "暂无肌群信息"
+            return L10n.string("暂无肌群信息")
         }
 
         return muscles.map { muscle in
             muscle.count > 1 ? "\(muscle.name) × \(muscle.count)" : muscle.name
-        }.joined(separator: "、")
+        }.joined(separator: L10n.listSeparator)
     }
 
     private func exercise(for entry: TrainingEntry) -> Exercise? {
@@ -634,7 +640,7 @@ private struct TrainingPhotoStrip: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("查看训练图片")
+                    .accessibilityLabel(L10n.string("查看训练图片"))
                 }
             }
             .padding(.vertical, 2)
@@ -668,7 +674,7 @@ private struct TrainingPhotoDetail: View {
                     } label: {
                         Image(systemName: "trash")
                     }
-                    .accessibilityLabel("删除训练图片")
+                    .accessibilityLabel(L10n.string("删除训练图片"))
                 }
 
                 ToolbarItem(placement: .confirmationAction) {
@@ -735,7 +741,7 @@ private struct TrainingEntryRow: View {
 
     private var content: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(entry.exerciseName)
+            Text(exercise?.localizedName ?? entry.exerciseName)
                 .font(.headline)
                 .foregroundStyle(.primary)
 
@@ -784,7 +790,6 @@ private struct EditTrainingEntrySheet: View {
                     DatePicker("日期", selection: $date, displayedComponents: .date)
                 }
             }
-            .environment(\.locale, Locale(identifier: "zh_CN"))
             .navigationTitle("编辑训练记录")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -814,7 +819,7 @@ private struct SearchConfiguration: ViewModifier {
         if isEnabled {
             content.searchable(
                 text: $text,
-                prompt: "搜索名字、部位、器械或目标肌群"
+                prompt: Text("搜索名字、部位、器械或目标肌群")
             )
         } else {
             content
@@ -836,15 +841,18 @@ private struct FilterMenu: View {
                 }
             }
         } label: {
-            HStack(spacing: 5) {
+            HStack(spacing: 4) {
                 Image(systemName: systemImage)
                 Text(localized(title))
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: 84)
                 Image(systemName: "chevron.down")
                     .font(.caption2)
                     .opacity(0.7)
             }
-            .font(.subheadline)
+            .font(.caption)
             .foregroundStyle(Color.accentColor)
         }
         .buttonStyle(.bordered)
@@ -855,7 +863,7 @@ private struct FilterMenu: View {
 
     private func localized(_ value: String) -> String {
         if value.hasPrefix("全部") {
-            return value
+            return L10n.string(value)
         }
         return ExerciseTerms.localized(value)
     }
@@ -880,7 +888,7 @@ private struct ExerciseRow: View {
                     Label(ExerciseTerms.localized(exercise.bodyPart), systemImage: "figure.mixed.cardio")
                     Label(ExerciseTerms.localized(exercise.equipment), systemImage: "dumbbell")
                     Label(
-                        "目标：\(ExerciseTerms.localized(exercise.target))",
+                        L10n.format("目标：%@", ExerciseTerms.localized(exercise.target)),
                         systemImage: "scope"
                     )
                 }

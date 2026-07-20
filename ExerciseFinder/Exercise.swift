@@ -33,14 +33,18 @@ struct Exercise: Codable, Identifiable, Hashable {
         case attribution
     }
 
-    var localizedName: String {
+    var chineseName: String {
         nameZh?.nonEmpty ?? name.capitalized
+    }
+
+    var localizedName: String {
+        L10n.prefersEnglish ? name.capitalized : chineseName
     }
 
     var searchableTerms: String {
         [
             name,
-            localizedName,
+            chineseName,
             ExerciseTerms.searchTerms(for: bodyPart),
             ExerciseTerms.searchTerms(for: equipment),
             ExerciseTerms.searchTerms(for: target)
@@ -197,12 +201,16 @@ enum ExerciseTerms {
         "wheel roller": ["腹肌轮", "健腹滚轮"]
     ]
 
-    static func localized(_ value: String) -> String {
+    static func localizedChinese(_ value: String) -> String {
         translations[value] ?? value.capitalized
     }
 
+    static func localized(_ value: String) -> String {
+        L10n.prefersEnglish ? value.capitalized : localizedChinese(value)
+    }
+
     static func searchTerms(for value: String) -> String {
-        ([value, localized(value)] + (searchAliases[value] ?? []))
+        ([value, localizedChinese(value)] + (searchAliases[value] ?? []))
             .joined(separator: " ")
     }
 }

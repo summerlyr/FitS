@@ -307,6 +307,6 @@ private enum DatasetError: LocalizedError {
     case missingFile
 
     var errorDescription: String? {
-        "找不到内置的动作数据库。"
+        L10n.string("找不到内置的动作数据库。")
     }
 }
