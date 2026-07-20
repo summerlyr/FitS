@@ -1,21 +1,30 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#07152F"/>
-      <stop offset="1" stop-color="#102A4C"/>
+    <linearGradient id="background" x1="96" y1="72" x2="912" y2="952" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#07162E"/>
+      <stop offset="1" stop-color="#102B4B"/>
     </linearGradient>
-    <linearGradient id="motion" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#31E6C3"/>
-      <stop offset="1" stop-color="#2388FF"/>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(690 264) rotate(135) scale(620)">
+      <stop offset="0" stop-color="#246E9C" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#07162E" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark" x1="292" y1="816" x2="786" y2="230" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#2388FF"/>
+      <stop offset="0.52" stop-color="#25C8DE"/>
+      <stop offset="1" stop-color="#35E1B9"/>
     </linearGradient>
+    <filter id="shadow" x="180" y="150" width="700" height="760" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="28" stdDeviation="24" flood-color="#020916" flood-opacity="0.32"/>
+    </filter>
   </defs>
+
   <rect width="1024" height="1024" fill="url(#background)"/>
-  <circle cx="512" cy="512" r="326" fill="none" stroke="#183E65" stroke-width="18"/>
-  <path d="M294 698 C366 622 416 541 446 450 C478 353 543 298 665 284"
-        fill="none" stroke="url(#motion)" stroke-width="92" stroke-linecap="round"/>
-  <path d="M414 492 C503 462 601 459 724 477"
-        fill="none" stroke="url(#motion)" stroke-width="82" stroke-linecap="round"/>
-  <path d="M436 661 C515 628 600 627 690 650"
-        fill="none" stroke="#31E6C3" stroke-width="58" stroke-linecap="round"/>
-  <circle cx="684" cy="286" r="48" fill="#31E6C3"/>
+  <rect width="1024" height="1024" fill="url(#glow)"/>
+
+  <g filter="url(#shadow)" fill="url(#mark)">
+    <path d="M300 794L390 250C399 196 445 156 500 156H769C812 156 846 191 846 234C846 277 812 312 769 312H529L499 493H687C729 493 763 527 763 569C763 611 729 645 687 645H474L446 816C438 866 395 904 344 904C282 904 268 851 300 794Z"/>
+  </g>
+
+  <path d="M731 156H823L778 312H686L731 156Z" fill="#49EDC4" fill-opacity="0.72"/>
+  <path d="M656 493H748L704 645H612L656 493Z" fill="#32D7C7" fill-opacity="0.56"/>
 </svg>

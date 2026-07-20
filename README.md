@@ -1,4 +1,14 @@
-# FitS
+<p align="center">
+  <img src="ExerciseFinder/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png" width="120" alt="FitS app icon">
+</p>
+
+<h1 align="center">FitS</h1>
+
+<p align="center">
+  <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%2017%2B-0A84FF">
+  <img alt="SwiftUI" src="https://img.shields.io/badge/UI-SwiftUI-35C3D6">
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-34C759"></a>
+</p>
 
 FitS 是一个使用 SwiftUI 构建的本地健身动作浏览和训练记录 App。它提供中英文动作信息、专业术语搜索、收藏、替代动作推荐，以及按日期组织的个人训练记录。
 

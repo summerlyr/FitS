@@ -1,0 +1,40 @@
+name: Bug report
+description: 报告可以稳定复现的问题
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请说明实际发生了什么，以及你原本期望的行为。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开……
+        2. 点击……
+        3. 观察……
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: 设备与系统
+      placeholder: iPhone 17 Pro, iOS 26.3
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Commit 或版本
+      placeholder: main / commit SHA
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 截图或补充信息
+      description: 如适用，请添加截图、录屏或控制台信息。请勿上传私人训练照片。
