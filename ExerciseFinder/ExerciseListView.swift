@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct ExerciseListView: View {
     let searchEnabled: Bool
@@ -92,6 +93,16 @@ struct ExerciseListView: View {
                             Label("今日训练", systemImage: "calendar.badge.plus")
                         }
                         .tint(.blue)
+
+                        Button {
+                            favorites.toggle(exercise)
+                        } label: {
+                            Label(
+                                favorites.contains(exercise) ? "取消收藏" : "收藏",
+                                systemImage: favorites.contains(exercise) ? "heart.fill" : "heart"
+                            )
+                        }
+                        .tint(favorites.contains(exercise) ? .red : .gray)
                     }
                 }
             }
@@ -244,9 +255,8 @@ private struct AddTrainingEntrySheet: View {
 struct TrainingView: View {
     @EnvironmentObject private var training: TrainingStore
     @EnvironmentObject private var store: ExerciseStore
-    @State private var entryToEdit: TrainingEntry?
-    @State private var entryToDelete: TrainingEntry?
-    @State private var isShowingDeleteConfirmation = false
+    @State private var sessionDateToDelete: Date?
+    @State private var isShowingSessionDeleteConfirmation = false
 
     private var trainingDates: [Date] {
         Set(training.entries.map { Calendar.current.startOfDay(for: $0.date) })
@@ -266,36 +276,25 @@ struct TrainingView: View {
                     List {
                         ForEach(trainingDates, id: \.self) { date in
                             Section {
-                                ForEach(entries(on: date)) { entry in
-                                    TrainingEntryRow(
-                                        entry: entry,
-                                        exercise: exercise(for: entry)
+                                NavigationLink {
+                                    TrainingSessionDetailView(date: date)
+                                } label: {
+                                    TrainingSessionRow(
+                                        entries: entries(on: date),
+                                        exercises: store.exercises,
+                                        photoCount: training.photos(on: date).count
                                     )
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                        Button(role: .destructive) {
-                                            entryToDelete = entry
-                                            isShowingDeleteConfirmation = true
-                                        } label: {
-                                            Label("删除", systemImage: "trash")
-                                        }
-
-                                        Button {
-                                            entryToEdit = entry
-                                        } label: {
-                                            Label("编辑", systemImage: "pencil")
-                                        }
-                                        .tint(.blue)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        sessionDateToDelete = date
+                                        isShowingSessionDeleteConfirmation = true
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
                                     }
                                 }
                             } header: {
-                                Text(date.formatted(
-                                    .dateTime
-                                        .year()
-                                        .month()
-                                        .day()
-                                        .weekday()
-                                        .locale(Locale(identifier: "zh_CN"))
-                                ))
+                                Text(formattedDate(date))
                             }
                         }
                     }
@@ -307,8 +306,239 @@ struct TrainingView: View {
         .task {
             await store.load()
         }
+        .alert(
+            "删除整次训练？",
+            isPresented: $isShowingSessionDeleteConfirmation,
+            presenting: sessionDateToDelete
+        ) { date in
+            Button("删除", role: .destructive) {
+                training.deleteSession(on: date)
+                sessionDateToDelete = nil
+            }
+            Button("取消", role: .cancel) {
+                sessionDateToDelete = nil
+            }
+        } message: { date in
+            Text(
+                "将删除 \(formattedDate(date)) 的 \(entries(on: date).count) 个动作"
+                    + "和 \(training.photos(on: date).count) 张图片，此操作无法恢复。"
+            )
+        }
+    }
+
+    private func entries(on date: Date) -> [TrainingEntry] {
+        training.entries.filter {
+            Calendar.current.isDate($0.date, inSameDayAs: date)
+        }
+    }
+
+    private func formattedDate(_ date: Date) -> String {
+        date.formatted(
+            .dateTime
+                .year()
+                .month()
+                .day()
+                .weekday()
+                .locale(Locale(identifier: "zh_CN"))
+        )
+    }
+}
+
+private struct TrainingSessionRow: View {
+    let entries: [TrainingEntry]
+    let exercises: [Exercise]
+    let photoCount: Int
+
+    private var muscles: [MuscleSummaryItem] {
+        muscleSummary(for: entries, exercises: exercises)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 14) {
+                Label("\(entries.count) 个动作", systemImage: "figure.strengthtraining.traditional")
+
+                if photoCount > 0 {
+                    Label("\(photoCount) 张图片", systemImage: "photo")
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("主要肌群")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Text(muscles.isEmpty ? "暂无肌群信息" : shortMuscleSummary)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+            }
+        }
+        .padding(.vertical, 5)
+    }
+
+    private var shortMuscleSummary: String {
+        let visibleMuscles = muscles.prefix(3).map(\.name).joined(separator: "、")
+        let remainingCount = max(0, muscles.count - 3)
+        return remainingCount > 0 ? "\(visibleMuscles) 等 \(muscles.count) 个肌群" : visibleMuscles
+    }
+}
+
+private struct TrainingSessionDetailView: View {
+    let date: Date
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var training: TrainingStore
+    @EnvironmentObject private var store: ExerciseStore
+    @State private var entryToEdit: TrainingEntry?
+    @State private var entryToDelete: TrainingEntry?
+    @State private var selectedPhoto: TrainingPhoto?
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
+    @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingCopyConfirmation = false
+    @State private var isShowingImportError = false
+    @State private var isImportingPhotos = false
+    @State private var copiedEntryCount = 0
+
+    private var entries: [TrainingEntry] {
+        training.entries.filter {
+            Calendar.current.isDate($0.date, inSameDayAs: date)
+        }
+    }
+
+    private var photos: [TrainingPhoto] {
+        training.photos(on: date)
+    }
+
+    private var muscles: [MuscleSummaryItem] {
+        muscleSummary(for: entries, exercises: store.exercises)
+    }
+
+    var body: some View {
+        List {
+            Section("训练概览") {
+                DatePicker(
+                    "训练日期",
+                    selection: sessionDate,
+                    displayedComponents: .date
+                )
+                .environment(\.locale, Locale(identifier: "zh_CN"))
+                LabeledContent("动作数量", value: "\(entries.count) 个")
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("主要肌群")
+                        .foregroundStyle(.secondary)
+
+                    Text(detailedMuscleSummary)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 3)
+            }
+
+            if !photos.isEmpty {
+                Section("训练图片") {
+                    TrainingPhotoStrip(
+                        photos: photos,
+                        selectedPhoto: $selectedPhoto
+                    )
+                }
+            }
+
+            Section("训练动作") {
+                ForEach(entries) { entry in
+                    TrainingEntryRow(
+                        entry: entry,
+                        exercise: exercise(for: entry)
+                    )
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            entryToDelete = entry
+                            isShowingDeleteConfirmation = true
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+
+                        Button {
+                            entryToEdit = entry
+                        } label: {
+                            Label("编辑", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
+                }
+            }
+        }
+        .navigationTitle("训练详情")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if !Calendar.current.isDateInToday(date) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        copiedEntryCount = training.copySession(on: date)
+                        isShowingCopyConfirmation = copiedEntryCount > 0
+                    } label: {
+                        Image(systemName: "square.on.square")
+                    }
+                    .accessibilityLabel("将整次训练复制到今天")
+                }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                if isImportingPhotos {
+                    ProgressView()
+                } else {
+                    PhotosPicker(
+                        selection: $selectedPhotoItems,
+                        maxSelectionCount: 6,
+                        matching: .images
+                    ) {
+                        Image(systemName: "photo.badge.plus")
+                    }
+                    .accessibilityLabel("为这次训练添加图片")
+                }
+            }
+        }
+        .onChange(of: selectedPhotoItems) { _, items in
+            guard !items.isEmpty else {
+                return
+            }
+
+            isImportingPhotos = true
+            Task {
+                var importFailed = false
+
+                for item in items {
+                    guard let data = try? await item.loadTransferable(type: Data.self),
+                          training.addPhoto(data: data, to: date) else {
+                        importFailed = true
+                        continue
+                    }
+                }
+
+                selectedPhotoItems = []
+                isImportingPhotos = false
+                isShowingImportError = importFailed
+            }
+        }
         .sheet(item: $entryToEdit) { entry in
             EditTrainingEntrySheet(entry: entry)
+        }
+        .sheet(item: $selectedPhoto) { photo in
+            TrainingPhotoDetail(photo: photo)
+        }
+        .alert("已复制到今天", isPresented: $isShowingCopyConfirmation) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("已复制 \(copiedEntryCount) 个训练动作，原有备注也已保留。")
+        }
+        .alert("部分图片无法添加", isPresented: $isShowingImportError) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text("请换一张图片后重试。")
         }
         .alert(
             "删除训练记录？",
@@ -327,14 +557,163 @@ struct TrainingView: View {
         }
     }
 
-    private func entries(on date: Date) -> [TrainingEntry] {
-        training.entries.filter {
-            Calendar.current.isDate($0.date, inSameDayAs: date)
+    private var sessionDate: Binding<Date> {
+        Binding(
+            get: { date },
+            set: { targetDate in
+                guard !Calendar.current.isDate(date, inSameDayAs: targetDate) else {
+                    return
+                }
+
+                training.moveSession(from: date, to: targetDate)
+                dismiss()
+            }
+        )
+    }
+
+    private var detailedMuscleSummary: String {
+        guard !muscles.isEmpty else {
+            return "暂无肌群信息"
         }
+
+        return muscles.map { muscle in
+            muscle.count > 1 ? "\(muscle.name) × \(muscle.count)" : muscle.name
+        }.joined(separator: "、")
     }
 
     private func exercise(for entry: TrainingEntry) -> Exercise? {
         store.exercises.first { $0.id == entry.exerciseID }
+    }
+}
+
+private struct MuscleSummaryItem {
+    let name: String
+    let count: Int
+}
+
+private func muscleSummary(
+    for entries: [TrainingEntry],
+    exercises: [Exercise]
+) -> [MuscleSummaryItem] {
+    let exercisesByID = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+    let counts = entries.reduce(into: [String: Int]()) { result, entry in
+        guard let target = exercisesByID[entry.exerciseID]?.target else {
+            return
+        }
+        result[target, default: 0] += 1
+    }
+
+    return counts.map { target, count in
+        MuscleSummaryItem(name: ExerciseTerms.localized(target), count: count)
+    }.sorted { left, right in
+        if left.count != right.count {
+            return left.count > right.count
+        }
+        return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+    }
+}
+
+private struct TrainingPhotoStrip: View {
+    let photos: [TrainingPhoto]
+    @Binding var selectedPhoto: TrainingPhoto?
+
+    @EnvironmentObject private var training: TrainingStore
+
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 10) {
+                ForEach(photos) { photo in
+                    Button {
+                        selectedPhoto = photo
+                    } label: {
+                        TrainingPhotoImage(
+                            url: training.url(for: photo),
+                            contentMode: .fill
+                        )
+                        .frame(width: 92, height: 92)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("查看训练图片")
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .scrollIndicators(.hidden)
+    }
+}
+
+private struct TrainingPhotoDetail: View {
+    let photo: TrainingPhoto
+
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var training: TrainingStore
+    @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingDeleteError = false
+
+    var body: some View {
+        NavigationStack {
+            TrainingPhotoImage(
+                url: training.url(for: photo),
+                contentMode: .fit
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.black)
+            .navigationTitle("训练图片")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(role: .destructive) {
+                        isShowingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .accessibilityLabel("删除训练图片")
+                }
+
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+            .alert("删除这张训练图片？", isPresented: $isShowingDeleteConfirmation) {
+                Button("删除", role: .destructive) {
+                    if training.delete(photo) {
+                        dismiss()
+                    } else {
+                        isShowingDeleteError = true
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("删除后无法恢复。")
+            }
+            .alert("无法删除图片", isPresented: $isShowingDeleteError) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text("请稍后重试。")
+            }
+        }
+    }
+}
+
+private struct TrainingPhotoImage: View {
+    let url: URL
+    let contentMode: ContentMode
+
+    var body: some View {
+        if let image = UIImage(contentsOfFile: url.path) {
+            Image(uiImage: image)
+                .resizable()
+                .aspectRatio(contentMode: contentMode)
+        } else {
+            ZStack {
+                Color(.secondarySystemBackground)
+                Image(systemName: "photo")
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

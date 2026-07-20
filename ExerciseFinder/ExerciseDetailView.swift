@@ -3,6 +3,7 @@ import WebKit
 
 struct ExerciseDetailView: View {
     let exercise: Exercise
+    @EnvironmentObject private var store: ExerciseStore
     @EnvironmentObject private var favorites: FavoritesStore
     @State private var language = DetailLanguage.chinese
     @State private var shareImage: UIImage?
@@ -66,6 +67,31 @@ struct ExerciseDetailView: View {
                 Text(exercise.attribution)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                if !alternativeExercises.isEmpty {
+                    Divider()
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(language.alternativesTitle)
+                            .font(.title2.bold())
+
+                        Text(language.alternativesSubtitle)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+
+                        ForEach(alternativeExercises) { alternative in
+                            NavigationLink {
+                                ExerciseDetailView(exercise: alternative)
+                            } label: {
+                                AlternativeExerciseRow(
+                                    exercise: alternative,
+                                    language: language
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
             }
             .padding()
         }
@@ -87,7 +113,7 @@ struct ExerciseDetailView: View {
                     favorites.toggle(exercise)
                 } label: {
                     Image(systemName: favorites.contains(exercise) ? "heart.fill" : "heart")
-                        .foregroundStyle(favorites.contains(exercise) ? Color.red : Color.primary)
+                        .foregroundStyle(favorites.contains(exercise) ? Color.red : Color.secondary)
                 }
                 .accessibilityLabel(favorites.contains(exercise) ? "取消收藏" : "收藏")
             }
@@ -103,6 +129,68 @@ struct ExerciseDetailView: View {
             ?? exercise.instructionSteps["en"]
             ?? []
     }
+
+    private var alternativeExercises: [Exercise] {
+        let candidates = store.exercises.filter { candidate in
+            candidate.id != exercise.id
+                && (candidate.target == exercise.target
+                    || candidate.muscleGroup == exercise.muscleGroup
+                    || candidate.bodyPart == exercise.bodyPart)
+        }
+
+        return Array(
+            candidates.sorted { left, right in
+                let leftScore = alternativeScore(for: left)
+                let rightScore = alternativeScore(for: right)
+
+                if leftScore != rightScore {
+                    return leftScore > rightScore
+                }
+                return left.name.localizedCaseInsensitiveCompare(right.name) == .orderedAscending
+            }
+            .prefix(5)
+        )
+    }
+
+    private func alternativeScore(for candidate: Exercise) -> Int {
+        var score = 0
+
+        if candidate.target == exercise.target { score += 120 }
+        if candidate.muscleGroup == exercise.muscleGroup { score += 30 }
+        if candidate.bodyPart == exercise.bodyPart { score += 15 }
+        if candidate.category == exercise.category { score += 5 }
+        if candidate.equipment == exercise.equipment { score += 4 }
+
+        let sharedSecondaryMuscles = Set(candidate.secondaryMuscles)
+            .intersection(Set(exercise.secondaryMuscles))
+        score += sharedSecondaryMuscles.count * 4
+
+        if candidate.secondaryMuscles.contains(exercise.target) { score += 10 }
+        if exercise.secondaryMuscles.contains(candidate.target) { score += 10 }
+
+        let sharedNameTokens = movementTokens(for: candidate)
+            .intersection(movementTokens(for: exercise))
+        score += sharedNameTokens.count * 12
+
+        return score
+    }
+
+    private func movementTokens(for exercise: Exercise) -> Set<String> {
+        Set(
+            exercise.name
+                .lowercased()
+                .split { !$0.isLetter && !$0.isNumber }
+                .map(String.init)
+                .filter { $0.count > 2 && !Self.variantWords.contains($0) }
+        )
+    }
+
+    private static let variantWords: Set<String> = [
+        "and", "with", "the", "one", "single", "alternating",
+        "assisted", "weighted", "standing", "seated", "lying",
+        "incline", "decline", "reverse", "wide", "close", "grip",
+        "arm", "leg", "barbell", "dumbbell", "cable", "band", "machine"
+    ]
 
     private func value(_ value: String) -> String {
         language == .chinese ? ExerciseTerms.localized(value) : value.capitalized
@@ -170,8 +258,69 @@ private enum DetailLanguage: String, CaseIterable, Identifiable {
     var muscleGroupTitle: String { self == .chinese ? "协同肌群" : "Muscle Group" }
     var secondaryMusclesTitle: String { self == .chinese ? "辅助肌群" : "Secondary Muscles" }
     var instructionsTitle: String { self == .chinese ? "动作步骤" : "Instructions" }
+    var alternativesTitle: String { self == .chinese ? "替代动作" : "Alternatives" }
+    var alternativesSubtitle: String {
+        self == .chinese
+            ? "根据目标肌肉、锻炼部位和动作特征推荐"
+            : "Recommended by target muscle, body part, and movement pattern"
+    }
     var shareTitle: String { self == .chinese ? "分享详情长图" : "Share Full Detail Image" }
     var listSeparator: String { self == .chinese ? "、" : ", " }
+}
+
+private struct AlternativeExerciseRow: View {
+    let exercise: Exercise
+    let language: DetailLanguage
+
+    var body: some View {
+        HStack(spacing: 12) {
+            LocalExerciseImage(path: exercise.image)
+                .frame(width: 72, height: 72)
+                .background(Color(.secondarySystemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(name)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+
+                Text(equipment)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+
+                Text(target)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.bold())
+                .foregroundStyle(.tertiary)
+        }
+        .padding(12)
+        .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+        .contentShape(Rectangle())
+    }
+
+    private var name: String {
+        language == .chinese ? exercise.localizedName : exercise.name.capitalized
+    }
+
+    private var equipment: String {
+        language == .chinese
+            ? ExerciseTerms.localized(exercise.equipment)
+            : exercise.equipment.capitalized
+    }
+
+    private var target: String {
+        let value = language == .chinese
+            ? ExerciseTerms.localized(exercise.target)
+            : exercise.target.capitalized
+        let separator = language == .chinese ? "：" : ": "
+        return "\(language.targetTitle)\(separator)\(value)"
+    }
 }
 
 private struct ExerciseShareCard: View {
