@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="ExerciseFinder/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png" width="120" alt="FitS app icon">
+  <img src="Artwork/FitS-AppIcon.svg" width="120" alt="FitS app icon">
 </p>
 
 <h1 align="center">FitS</h1>

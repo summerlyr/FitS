@@ -13,7 +13,7 @@
       <stop offset="0.52" stop-color="#25C8DE"/>
       <stop offset="1" stop-color="#35E1B9"/>
     </linearGradient>
-    <filter id="shadow" x="180" y="150" width="700" height="760" filterUnits="userSpaceOnUse">
+    <filter id="shadow" x="160" y="120" width="760" height="820" filterUnits="userSpaceOnUse">
       <feDropShadow dx="0" dy="28" stdDeviation="24" flood-color="#020916" flood-opacity="0.32"/>
     </filter>
   </defs>
@@ -21,10 +21,15 @@
   <rect width="1024" height="1024" fill="url(#background)"/>
   <rect width="1024" height="1024" fill="url(#glow)"/>
 
-  <g filter="url(#shadow)" fill="url(#mark)">
-    <path d="M300 794L390 250C399 196 445 156 500 156H769C812 156 846 191 846 234C846 277 812 312 769 312H529L499 493H687C729 493 763 527 763 569C763 611 729 645 687 645H474L446 816C438 866 395 904 344 904C282 904 268 851 300 794Z"/>
+  <g
+    filter="url(#shadow)"
+    fill="none"
+    stroke="url(#mark)"
+    stroke-width="156"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M344 824L450 242H766"/>
+    <path d="M418 568H684"/>
   </g>
-
-  <path d="M731 156H823L778 312H686L731 156Z" fill="#49EDC4" fill-opacity="0.72"/>
-  <path d="M656 493H748L704 645H612L656 493Z" fill="#32D7C7" fill-opacity="0.56"/>
 </svg>
