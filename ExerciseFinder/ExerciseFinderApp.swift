@@ -11,6 +11,7 @@ struct ExerciseFinderApp: App {
     @State private var favoriteBodyPart = "全部部位"
     @State private var favoriteEquipment = "全部器械"
     @State private var selectedTab = AppTab.favorites
+    @State private var lastNonSearchTab = AppTab.favorites
 
     var body: some Scene {
         WindowGroup {
@@ -46,10 +47,19 @@ struct ExerciseFinderApp: App {
                         Tab(value: AppTab.search, role: .search) {
                             exerciseList(
                                 searchEnabled: true,
+                                automaticallyFocusSearch: selectedTab == .search,
+                                onSearchDismiss: {
+                                    selectedTab = lastNonSearchTab
+                                },
                                 favoritesOnly: false,
                                 bodyPart: $selectedBodyPart,
                                 equipment: $selectedEquipment
                             )
+                        }
+                    }
+                    .onChange(of: selectedTab) { _, tab in
+                        if tab != .search {
+                            lastNonSearchTab = tab
                         }
                     }
                 } else {
@@ -95,12 +105,16 @@ struct ExerciseFinderApp: App {
 
     private func exerciseList(
         searchEnabled: Bool,
+        automaticallyFocusSearch: Bool = false,
+        onSearchDismiss: @escaping () -> Void = {},
         favoritesOnly: Bool,
         bodyPart: Binding<String>,
         equipment: Binding<String>
     ) -> some View {
         ExerciseListView(
             searchEnabled: searchEnabled,
+            automaticallyFocusSearch: automaticallyFocusSearch,
+            onSearchDismiss: onSearchDismiss,
             selectedBodyPart: bodyPart,
             selectedEquipment: equipment,
             showsFavoritesOnly: favoritesOnly

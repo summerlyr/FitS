@@ -3,6 +3,8 @@ import PhotosUI
 
 struct ExerciseListView: View {
     let searchEnabled: Bool
+    let automaticallyFocusSearch: Bool
+    let onSearchDismiss: () -> Void
     @Binding var selectedBodyPart: String
     @Binding var selectedEquipment: String
     let showsFavoritesOnly: Bool
@@ -10,7 +12,13 @@ struct ExerciseListView: View {
     @EnvironmentObject private var store: ExerciseStore
     @EnvironmentObject private var favorites: FavoritesStore
     @State private var searchText = ""
+    @State private var isSearchPresented = false
+    @State private var isVisible = false
+    @State private var shouldFocusOnNextAppearance = true
+    @FocusState private var isSearchFocused: Bool
     @State private var exerciseToLog: Exercise?
+    @State private var presentedExercise: Exercise?
+    @State private var shouldRestoreSearchFocus = false
 
     private var bodyParts: [String] {
         ["全部部位"] + Set(store.exercises.map(\.bodyPart)).sorted()
@@ -65,6 +73,17 @@ struct ExerciseListView: View {
                 }
             }
         }
+        .modifier(
+            SearchConfiguration(
+                isEnabled: searchEnabled,
+                text: $searchText,
+                isPresented: $isSearchPresented,
+                isFocused: $isSearchFocused
+            )
+        )
+        .onSubmit(of: .search) {
+            dismissSearchKeyboard()
+        }
         .task {
             await store.load()
         }
@@ -88,9 +107,7 @@ struct ExerciseListView: View {
                 .listRowBackground(Color.clear)
             } else {
                 ForEach(filteredExercises) { exercise in
-                    NavigationLink(value: exercise) {
-                        ExerciseRow(exercise: exercise)
-                    }
+                    exerciseLink(for: exercise)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button {
                             exerciseToLog = exercise
@@ -113,12 +130,102 @@ struct ExerciseListView: View {
             }
         }
         .listStyle(.plain)
-        .modifier(SearchConfiguration(isEnabled: searchEnabled, text: $searchText))
+        .modifier(
+            ScrollKeyboardDismissConfiguration {
+                dismissSearchKeyboard()
+            }
+        )
+        .onAppear {
+            isVisible = true
+            if automaticallyFocusSearch && shouldFocusOnNextAppearance {
+                presentSearch(focus: true)
+                shouldFocusOnNextAppearance = false
+            }
+        }
+        .onChange(of: automaticallyFocusSearch) { _, shouldFocus in
+            if shouldFocus {
+                shouldFocusOnNextAppearance = true
+                if isVisible {
+                    presentSearch(focus: true)
+                    shouldFocusOnNextAppearance = false
+                }
+            }
+        }
+        .onChange(of: isSearchPresented) { wasPresented, isPresented in
+            if automaticallyFocusSearch && wasPresented && !isPresented {
+                DispatchQueue.main.async {
+                    if isVisible && presentedExercise == nil {
+                        onSearchDismiss()
+                    }
+                }
+            }
+        }
+        .onDisappear {
+            isVisible = false
+            isSearchFocused = false
+            if !automaticallyFocusSearch {
+                isSearchPresented = false
+            }
+        }
         .navigationDestination(for: Exercise.self) { exercise in
             ExerciseDetailView(exercise: exercise)
         }
         .sheet(item: $exerciseToLog) { exercise in
             AddTrainingEntrySheet(exercise: exercise)
+        }
+        .fullScreenCover(item: $presentedExercise, onDismiss: restoreSearchFocusIfNeeded) {
+            SearchExerciseDetailPresentation(exercise: $0)
+        }
+    }
+
+    private func dismissSearchKeyboard() {
+        if #available(iOS 18.0, *) {
+            isSearchFocused = false
+        } else {
+            isSearchPresented = false
+        }
+    }
+
+    private func presentSearch(focus: Bool) {
+        guard automaticallyFocusSearch else { return }
+
+        isSearchPresented = true
+        if focus {
+            DispatchQueue.main.async {
+                isSearchFocused = true
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func exerciseLink(for exercise: Exercise) -> some View {
+        if automaticallyFocusSearch {
+            Button {
+                shouldRestoreSearchFocus = isSearchFocused
+                isSearchFocused = false
+                presentedExercise = exercise
+            } label: {
+                HStack(spacing: 8) {
+                    ExerciseRow(exercise: exercise)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.bold())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+            .buttonStyle(.plain)
+        } else {
+            NavigationLink(value: exercise) {
+                ExerciseRow(exercise: exercise)
+            }
+        }
+    }
+
+    private func restoreSearchFocusIfNeeded() {
+        guard shouldRestoreSearchFocus else { return }
+        shouldRestoreSearchFocus = false
+        DispatchQueue.main.async {
+            isSearchFocused = true
         }
     }
 
@@ -188,6 +295,28 @@ struct ExerciseListView: View {
         withTransaction(transaction) {
             selectedBodyPart = "全部部位"
             selectedEquipment = "全部器械"
+        }
+    }
+}
+
+private struct SearchExerciseDetailPresentation: View {
+    let exercise: Exercise
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ExerciseDetailView(exercise: exercise)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel(L10n.string("返回"))
+                    }
+                }
         }
     }
 }
@@ -810,20 +939,51 @@ private struct EditTrainingEntrySheet: View {
     }
 }
 
+private struct ScrollKeyboardDismissConfiguration: ViewModifier {
+    let dismiss: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 18.0, *) {
+            content
+                .scrollDismissesKeyboard(.immediately)
+                .onScrollPhaseChange { _, phase in
+                    if phase != .idle {
+                        dismiss()
+                    }
+                }
+        } else {
+            content.scrollDismissesKeyboard(.immediately)
+        }
+    }
+}
+
 private struct SearchConfiguration: ViewModifier {
     let isEnabled: Bool
     @Binding var text: String
+    @Binding var isPresented: Bool
+    let isFocused: FocusState<Bool>.Binding
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if isEnabled {
-            content.searchable(
-                text: $text,
-                prompt: Text("搜索名字、部位、器械或目标肌群")
-            )
+            if #available(iOS 18.0, *) {
+                searchableContent(content)
+                    .searchFocused(isFocused)
+            } else {
+                searchableContent(content)
+            }
         } else {
             content
         }
+    }
+
+    private func searchableContent(_ content: Content) -> some View {
+        content.searchable(
+            text: $text,
+            isPresented: $isPresented,
+            prompt: Text("搜索名字、部位、器械或目标肌群")
+        )
     }
 }
 

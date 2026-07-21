@@ -25,7 +25,7 @@
 "目标：%@" = "Target: %@";
 
 "例如：60 kg × 8 次 × 4 组" = "Example: 60 kg × 8 reps × 4 sets";
-"训练记录" = "Workout Log";
+"训练记录" = "Workouts";
 "重量、次数和组数暂时作为自由文本记录。" = "Record weight, reps, and sets as free-form notes.";
 "训练日期" = "Workout Date";
 "加入今日训练" = "Add to Today's Workout";
