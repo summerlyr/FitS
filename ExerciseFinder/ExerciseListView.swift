@@ -383,6 +383,9 @@ private struct AddTrainingEntrySheet: View {
 struct TrainingView: View {
     @EnvironmentObject private var training: TrainingStore
     @EnvironmentObject private var store: ExerciseStore
+    @State private var presentationMode = TrainingPresentationMode.calendar
+    @State private var visibleMonth = Calendar.current.dateInterval(of: .month, for: .now)?.start ?? .now
+    @State private var selectedDate: Date?
     @State private var sessionDateToDelete: Date?
     @State private var isShowingSessionDeleteConfirmation = false
 
@@ -394,44 +397,23 @@ struct TrainingView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if training.entries.isEmpty {
-                    ContentUnavailableView(
-                        "还没有训练记录",
-                        systemImage: "calendar.badge.plus",
-                        description: Text("从动作或收藏列表左滑，将动作加入今日训练。")
-                    )
-                } else {
-                    List {
-                        ForEach(trainingDates, id: \.self) { date in
-                            Section {
-                                NavigationLink {
-                                    TrainingSessionDetailView(date: date)
-                                } label: {
-                                    TrainingSessionRow(
-                                        entries: entries(on: date),
-                                        exercises: store.exercises,
-                                        photoCount: training.photos(on: date).count
-                                    )
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button(role: .destructive) {
-                                        sessionDateToDelete = date
-                                        isShowingSessionDeleteConfirmation = true
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
-                                    }
-                                }
-                            } header: {
-                                Text(formattedDate(date))
-                            }
-                        }
-                    }
-                    .listStyle(.insetGrouped)
+                switch presentationMode {
+                case .calendar:
+                    calendarView
+                case .list:
+                    listView
                 }
             }
             .navigationTitle("训练记录")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    Button {
+                        presentationMode.toggle()
+                    } label: {
+                        Image(systemName: presentationMode.toggleIcon)
+                    }
+                    .accessibilityLabel(L10n.string(presentationMode.toggleLabel))
+
                     AppLanguageButton()
                 }
             }
@@ -461,6 +443,117 @@ struct TrainingView: View {
         }
     }
 
+    @ViewBuilder
+    private var listView: some View {
+        if training.entries.isEmpty {
+            emptyState
+        } else {
+            List {
+                ForEach(trainingDates, id: \.self) { date in
+                    Section {
+                        NavigationLink {
+                            TrainingSessionDetailView(date: date)
+                        } label: {
+                            TrainingSessionRow(
+                                entries: entries(on: date),
+                                exercises: store.exercises,
+                                photoCount: training.photos(on: date).count
+                            )
+                        }
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                sessionDateToDelete = date
+                                isShowingSessionDeleteConfirmation = true
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
+                    } header: {
+                        Text(formattedDate(date))
+                    }
+                }
+            }
+            .listStyle(.insetGrouped)
+        }
+    }
+
+    private var calendarView: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                TrainingCalendar(
+                    visibleMonth: $visibleMonth,
+                    selectedDate: $selectedDate,
+                    trainingDates: Set(trainingDates)
+                )
+
+                calendarSelection
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 24)
+        }
+        .background(Color(.systemGroupedBackground))
+    }
+
+    @ViewBuilder
+    private var calendarSelection: some View {
+        if let selectedDate {
+            let selectedEntries = entries(on: selectedDate)
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text(formattedDate(selectedDate))
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if selectedEntries.isEmpty {
+                    Text("当日没有训练记录")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding()
+                        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                } else {
+                    NavigationLink {
+                        TrainingSessionDetailView(date: selectedDate)
+                    } label: {
+                        HStack(spacing: 12) {
+                            TrainingSessionRow(
+                                entries: selectedEntries,
+                                exercises: store.exercises,
+                                photoCount: training.photos(on: selectedDate).count
+                            )
+
+                            Spacer(minLength: 0)
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding()
+                        .background(.background, in: RoundedRectangle(cornerRadius: 16))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        } else if training.entries.isEmpty {
+            emptyState
+                .frame(minHeight: 220)
+        } else {
+            ContentUnavailableView(
+                "选择训练日期",
+                systemImage: "calendar.badge.checkmark",
+                description: Text("选择带标记的日期查看训练记录。")
+            )
+            .frame(minHeight: 220)
+        }
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView(
+            "还没有训练记录",
+            systemImage: "calendar.badge.plus",
+            description: Text("从动作或收藏列表左滑，将动作加入今日训练。")
+        )
+    }
+
     private func entries(on date: Date) -> [TrainingEntry] {
         training.entries.filter {
             Calendar.current.isDate($0.date, inSameDayAs: date)
@@ -469,6 +562,175 @@ struct TrainingView: View {
 
     private func formattedDate(_ date: Date) -> String {
         L10n.formattedDate(date)
+    }
+}
+
+private enum TrainingPresentationMode {
+    case calendar
+    case list
+
+    var toggleIcon: String {
+        self == .calendar ? "list.bullet" : "calendar"
+    }
+
+    var toggleLabel: String {
+        self == .calendar ? "切换到列表视图" : "切换到日历视图"
+    }
+
+    mutating func toggle() {
+        self = self == .calendar ? .list : .calendar
+    }
+}
+
+private struct TrainingCalendar: View {
+    @Binding var visibleMonth: Date
+    @Binding var selectedDate: Date?
+    let trainingDates: Set<Date>
+
+    private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = L10n.language.locale
+        return calendar
+    }
+
+    private var normalizedTrainingDates: Set<Date> {
+        Set(trainingDates.map { calendar.startOfDay(for: $0) })
+    }
+
+    private var weekdaySymbols: [String] {
+        let symbols = calendar.veryShortStandaloneWeekdaySymbols
+        let firstIndex = calendar.firstWeekday - 1
+        return Array(symbols[firstIndex...] + symbols[..<firstIndex])
+    }
+
+    private var monthDays: [Date?] {
+        guard let range = calendar.range(of: .day, in: .month, for: visibleMonth),
+              let firstDay = calendar.date(from: calendar.dateComponents([.year, .month], from: visibleMonth)) else {
+            return []
+        }
+
+        let firstWeekday = calendar.component(.weekday, from: firstDay)
+        let leadingEmptyDays = (firstWeekday - calendar.firstWeekday + 7) % 7
+        return Array(repeating: nil, count: leadingEmptyDays) + range.compactMap { day in
+            calendar.date(byAdding: .day, value: day - 1, to: firstDay)
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            HStack {
+                monthButton(systemImage: "chevron.left", label: "上个月", offset: -1)
+
+                Spacer()
+
+                Text(monthTitle)
+                    .font(.headline)
+
+                Spacer()
+
+                monthButton(systemImage: "chevron.right", label: "下个月", offset: 1)
+            }
+
+            LazyVGrid(columns: columns, spacing: 8) {
+                ForEach(Array(weekdaySymbols.enumerated()), id: \.offset) { _, symbol in
+                    Text(symbol)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                }
+
+                ForEach(Array(monthDays.enumerated()), id: \.offset) { _, date in
+                    if let date {
+                        dayButton(date)
+                    } else {
+                        Color.clear
+                            .frame(height: 42)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+        .gesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { value in
+                    guard abs(value.translation.width) > abs(value.translation.height),
+                          abs(value.translation.width) > 50 else {
+                        return
+                    }
+                    changeMonth(by: value.translation.width < 0 ? 1 : -1)
+                }
+        )
+    }
+
+    private var monthTitle: String {
+        visibleMonth.formatted(
+            .dateTime
+                .year()
+                .month(.wide)
+                .locale(L10n.language.locale)
+        )
+    }
+
+    private func monthButton(systemImage: String, label: String, offset: Int) -> some View {
+        Button {
+            changeMonth(by: offset)
+        } label: {
+            Image(systemName: systemImage)
+                .frame(width: 36, height: 36)
+        }
+        .accessibilityLabel(L10n.string(label))
+    }
+
+    private func dayButton(_ date: Date) -> some View {
+        let isSelected = selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false
+        let isToday = calendar.isDateInToday(date)
+        let hasTraining = normalizedTrainingDates.contains(calendar.startOfDay(for: date))
+
+        return Button {
+            selectedDate = calendar.startOfDay(for: date)
+        } label: {
+            VStack(spacing: 2) {
+                Text(String(calendar.component(.day, from: date)))
+                    .font(.body.weight(isSelected || isToday ? .semibold : .regular))
+                    .foregroundStyle(
+                        isSelected ? Color.white : (isToday ? Color.accentColor : Color.primary)
+                    )
+                    .frame(width: 34, height: 32)
+                    .background {
+                        if isSelected {
+                            Circle().fill(Color.accentColor)
+                        }
+                    }
+
+                Circle()
+                    .fill(hasTraining ? Color.accentColor : Color.clear)
+                    .frame(width: 5, height: 5)
+            }
+            .frame(maxWidth: .infinity, minHeight: 42)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(dayAccessibilityLabel(date, hasTraining: hasTraining))
+    }
+
+    private func dayAccessibilityLabel(_ date: Date, hasTraining: Bool) -> String {
+        let dateText = L10n.formattedDate(date)
+        return hasTraining ? "\(dateText)，\(L10n.string("有训练记录"))" : dateText
+    }
+
+    private func changeMonth(by offset: Int) {
+        guard let newMonth = calendar.date(byAdding: .month, value: offset, to: visibleMonth),
+              let start = calendar.dateInterval(of: .month, for: newMonth)?.start else {
+            return
+        }
+
+        withAnimation(.snappy) {
+            visibleMonth = start
+            selectedDate = nil
+        }
     }
 }
 

@@ -66,3 +66,11 @@
 "日期" = "Date";
 "编辑训练记录" = "Edit Workout Entry";
 "保存" = "Save";
+"切换到列表视图" = "Switch to list view";
+"切换到日历视图" = "Switch to calendar view";
+"上个月" = "Previous month";
+"下个月" = "Next month";
+"选择训练日期" = "Select a Workout Date";
+"选择带标记的日期查看训练记录。" = "Select a marked date to view its workout.";
+"当日没有训练记录" = "No workout recorded on this date";
+"有训练记录" = "Workout recorded";
