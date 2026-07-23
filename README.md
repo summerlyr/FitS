@@ -60,7 +60,7 @@ FitS 不需要账户，当前也不向服务器上传训练数据。收藏、训
 
 动作元数据和多语言说明来自 [`hasaneyldrm/exercises-dataset`](https://github.com/hasaneyldrm/exercises-dataset)，并针对中文术语、动作名称和搜索体验做了调整。
 
-动作图片和 GIF 为 **© Gym visual — https://gymvisual.com/**。这些媒体不属于本项目的 MIT License；公开仓库或署名本身不向下游使用者授予媒体许可。使用或再分发前，请查看 Gym visual 的条款，并根据自己的用途取得必要授权。
+动作图片和 GIF 为 [© Gym visual](https://gymvisual.com/)。这些媒体不属于本项目的 MIT License；公开仓库或署名本身不向下游使用者授予媒体许可。使用或再分发前，请查看 Gym visual 的条款，并根据自己的用途取得必要授权。
 
 完整的第三方归属和许可说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 

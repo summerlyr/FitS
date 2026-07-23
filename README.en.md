@@ -60,7 +60,7 @@ FitS does not require an account and currently does not upload workout data to a
 
 Exercise metadata and multilingual instructions are derived from [`hasaneyldrm/exercises-dataset`](https://github.com/hasaneyldrm/exercises-dataset) and have been adapted with additional Chinese terminology, exercise names, and search aliases.
 
-Exercise images and GIFs are **© Gym visual — https://gymvisual.com/**. These assets are not covered by this project's MIT License, and public availability or attribution does not itself grant downstream users a media license. Review Gym visual's terms and obtain any permission required for your intended use or redistribution.
+Exercise images and GIFs are [© Gym visual](https://gymvisual.com/). These assets are not covered by this project's MIT License, and public availability or attribution does not itself grant downstream users a media license. Review Gym visual's terms and obtain any permission required for your intended use or redistribution.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for complete attribution and licensing details.
 
