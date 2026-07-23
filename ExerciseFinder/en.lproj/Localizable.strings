@@ -34,7 +34,8 @@
 "还没有训练记录" = "No Workouts Yet";
 "从动作或收藏列表左滑，将动作加入今日训练。" = "Swipe left on an exercise or favorite to add it to today's workout.";
 "删除" = "Delete";
-"删除整次训练？" = "Delete Entire Workout?";
+"删除训练？" = "Delete Workout?";
+"删除训练" = "Delete Workout";
 "将删除 %@ 的 %ld 个动作和 %ld 张图片，此操作无法恢复。" = "This will permanently delete %2$ld exercises and %3$ld photos from %1$@.";
 "%ld 个动作" = "%ld exercises";
 "%ld 张图片" = "%ld photos";

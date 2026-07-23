@@ -47,7 +47,7 @@ struct ExerciseFinderApp: App {
                         Tab(value: AppTab.search, role: .search) {
                             exerciseList(
                                 searchEnabled: true,
-                                automaticallyFocusSearch: selectedTab == .search,
+                                isSearchTabActive: selectedTab == .search,
                                 onSearchDismiss: {
                                     selectedTab = lastNonSearchTab
                                 },
@@ -105,7 +105,7 @@ struct ExerciseFinderApp: App {
 
     private func exerciseList(
         searchEnabled: Bool,
-        automaticallyFocusSearch: Bool = false,
+        isSearchTabActive: Bool = false,
         onSearchDismiss: @escaping () -> Void = {},
         favoritesOnly: Bool,
         bodyPart: Binding<String>,
@@ -113,7 +113,7 @@ struct ExerciseFinderApp: App {
     ) -> some View {
         ExerciseListView(
             searchEnabled: searchEnabled,
-            automaticallyFocusSearch: automaticallyFocusSearch,
+            isSearchTabActive: isSearchTabActive,
             onSearchDismiss: onSearchDismiss,
             selectedBodyPart: bodyPart,
             selectedEquipment: equipment,

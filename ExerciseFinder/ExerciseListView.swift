@@ -3,7 +3,7 @@ import PhotosUI
 
 struct ExerciseListView: View {
     let searchEnabled: Bool
-    let automaticallyFocusSearch: Bool
+    let isSearchTabActive: Bool
     let onSearchDismiss: () -> Void
     @Binding var selectedBodyPart: String
     @Binding var selectedEquipment: String
@@ -14,7 +14,6 @@ struct ExerciseListView: View {
     @State private var searchText = ""
     @State private var isSearchPresented = false
     @State private var isVisible = false
-    @State private var shouldFocusOnNextAppearance = true
     @FocusState private var isSearchFocused: Bool
     @State private var exerciseToLog: Exercise?
     @State private var presentedExercise: Exercise?
@@ -137,22 +136,9 @@ struct ExerciseListView: View {
         )
         .onAppear {
             isVisible = true
-            if automaticallyFocusSearch && shouldFocusOnNextAppearance {
-                presentSearch(focus: true)
-                shouldFocusOnNextAppearance = false
-            }
-        }
-        .onChange(of: automaticallyFocusSearch) { _, shouldFocus in
-            if shouldFocus {
-                shouldFocusOnNextAppearance = true
-                if isVisible {
-                    presentSearch(focus: true)
-                    shouldFocusOnNextAppearance = false
-                }
-            }
         }
         .onChange(of: isSearchPresented) { wasPresented, isPresented in
-            if automaticallyFocusSearch && wasPresented && !isPresented {
+            if isSearchTabActive && wasPresented && !isPresented {
                 DispatchQueue.main.async {
                     if isVisible && presentedExercise == nil {
                         onSearchDismiss()
@@ -163,7 +149,7 @@ struct ExerciseListView: View {
         .onDisappear {
             isVisible = false
             isSearchFocused = false
-            if !automaticallyFocusSearch {
+            if !isSearchTabActive {
                 isSearchPresented = false
             }
         }
@@ -186,20 +172,9 @@ struct ExerciseListView: View {
         }
     }
 
-    private func presentSearch(focus: Bool) {
-        guard automaticallyFocusSearch else { return }
-
-        isSearchPresented = true
-        if focus {
-            DispatchQueue.main.async {
-                isSearchFocused = true
-            }
-        }
-    }
-
     @ViewBuilder
     private func exerciseLink(for exercise: Exercise) -> some View {
-        if automaticallyFocusSearch {
+        if isSearchTabActive {
             Button {
                 shouldRestoreSearchFocus = isSearchFocused
                 isSearchFocused = false
@@ -422,7 +397,7 @@ struct TrainingView: View {
             await store.load()
         }
         .alert(
-            "删除整次训练？",
+            "删除训练？",
             isPresented: $isShowingSessionDeleteConfirmation,
             presenting: sessionDateToDelete
         ) { date in
@@ -792,6 +767,7 @@ private struct TrainingSessionDetailView: View {
     @State private var selectedPhoto: TrainingPhoto?
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var isShowingDeleteConfirmation = false
+    @State private var isShowingSessionDeleteConfirmation = false
     @State private var isShowingCopyConfirmation = false
     @State private var isShowingImportError = false
     @State private var isImportingPhotos = false
@@ -864,6 +840,13 @@ private struct TrainingSessionDetailView: View {
                         .tint(.blue)
                     }
                 }
+            }
+
+            Section {
+                Button("删除训练", role: .destructive) {
+                    isShowingSessionDeleteConfirmation = true
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
         .navigationTitle("训练详情")
@@ -950,6 +933,20 @@ private struct TrainingSessionDetailView: View {
             Text(L10n.format(
                 "将删除“%@”这条训练记录。",
                 exercise(for: entry)?.localizedName ?? entry.exerciseName
+            ))
+        }
+        .alert("删除训练？", isPresented: $isShowingSessionDeleteConfirmation) {
+            Button("删除", role: .destructive) {
+                training.deleteSession(on: date)
+                dismiss()
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(L10n.format(
+                "将删除 %@ 的 %ld 个动作和 %ld 张图片，此操作无法恢复。",
+                L10n.formattedDate(date),
+                entries.count,
+                photos.count
             ))
         }
     }
