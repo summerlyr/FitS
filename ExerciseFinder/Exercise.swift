@@ -41,15 +41,47 @@ struct Exercise: Codable, Identifiable, Hashable {
         L10n.prefersEnglish ? name.capitalized : chineseName
     }
 
+    var isCardio: Bool {
+        category == "cardio"
+    }
+
+    var isBuiltInActivity: Bool {
+        id.hasPrefix("fits-activity-")
+    }
+
+    var mediaPlaceholderSystemImage: String {
+        isBuiltInActivity ? "figure.pool.swim" : "figure.strengthtraining.traditional"
+    }
+
     var searchableTerms: String {
         [
             name,
             chineseName,
+            ExerciseTerms.exerciseSearchTerms(for: name),
             ExerciseTerms.searchTerms(for: bodyPart),
             ExerciseTerms.searchTerms(for: equipment),
             ExerciseTerms.searchTerms(for: target)
         ].joined(separator: " ")
     }
+
+    static let builtInActivities: [Exercise] = [
+        Exercise(
+            id: "fits-activity-swimming",
+            name: "swimming",
+            nameZh: "游泳",
+            category: "cardio",
+            bodyPart: "cardio",
+            equipment: "none",
+            instructions: [:],
+            instructionSteps: [:],
+            muscleGroup: "cardiovascular system",
+            secondaryMuscles: [],
+            target: "cardiovascular system",
+            image: "",
+            gifURL: "",
+            attribution: ""
+        )
+    ]
 }
 
 private extension String {
@@ -130,6 +162,7 @@ enum ExerciseTerms {
         "kettlebell": "壶铃",
         "leverage machine": "杠杆式训练器",
         "medicine ball": "药球",
+        "none": "无需器械",
         "olympic barbell": "奥林匹克杠铃",
         "resistance band": "阻力带",
         "roller": "泡沫轴",
@@ -186,6 +219,7 @@ enum ExerciseTerms {
         "hammer": ["锤", "铁锤", "sledgehammer"],
         "leverage machine": ["固定器械", "杠杆器械", "训练机"],
         "medicine ball": ["实心球", "重力球"],
+        "none": ["无器械", "不需要器械"],
         "olympic barbell": ["奥杆", "奥林匹克杆"],
         "resistance band": ["弹力带", "拉力带"],
         "roller": ["滚筒", "按摩滚筒"],
@@ -201,6 +235,17 @@ enum ExerciseTerms {
         "wheel roller": ["腹肌轮", "健腹滚轮"]
     ]
 
+    private static let exerciseSearchAliases: [String: [String]] = [
+        "run": ["跑步", "慢跑"],
+        "run (equipment)": ["跑步机", "跑步"],
+        "cycle cross trainer": ["骑行", "室内骑行", "健身车"],
+        "stationary bike run v. 3": ["骑行", "动感单车", "室内单车"],
+        "stationary bike walk": ["骑行", "健身车", "固定自行车"],
+        "walk elliptical cross trainer": ["椭圆机", "椭圆仪"],
+        "walking on incline treadmill": ["坡度走", "爬坡走", "跑步机"],
+        "walking on stepmill": ["登阶机", "楼梯机", "踏步机"]
+    ]
+
     static func localizedChinese(_ value: String) -> String {
         translations[value] ?? value.capitalized
     }
@@ -212,5 +257,9 @@ enum ExerciseTerms {
     static func searchTerms(for value: String) -> String {
         ([value, localizedChinese(value)] + (searchAliases[value] ?? []))
             .joined(separator: " ")
+    }
+
+    static func exerciseSearchTerms(for name: String) -> String {
+        (exerciseSearchAliases[name] ?? []).joined(separator: " ")
     }
 }

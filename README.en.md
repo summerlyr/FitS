@@ -21,13 +21,13 @@ FitS is a local-first exercise browser and workout tracker built with SwiftUI. I
 ## Features
 
 - Search exercise names, equipment, body parts, and target muscles in English or Chinese, including professional terminology and common aliases
-- Filter 1,324 exercises by body part and equipment
+- Filter 1,324 dataset exercises and FitS built-in cardio activities by body part and equipment
 - View exercise animations, target muscles, secondary muscles, and bilingual instructions
 - Discover alternatives based on target muscle, body part, and movement characteristics
 - Save favorites and use list swipe actions to favorite an exercise or add it to today's workout
 - Log exercises by date with free-form notes for weight, repetitions, and sets
 - Attach photos, duplicate an entire workout, or move a workout session to another date
-- Export an exercise detail page as a long image through the system share sheet
+- Export an exercise detail page or workout record as a long image through the system share sheet
 
 ## Screenshots
 

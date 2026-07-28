@@ -302,6 +302,7 @@ private struct AddTrainingEntrySheet: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var training: TrainingStore
     @State private var notes = ""
+    @State private var cardioDurationMinutes = 30
 
     var body: some View {
         NavigationStack {
@@ -311,10 +312,25 @@ private struct AddTrainingEntrySheet: View {
                         .font(.headline)
                 }
 
+                if exercise.isCardio {
+                    Section("有氧记录") {
+                        Stepper(
+                            L10n.format("%ld 分钟", cardioDurationMinutes),
+                            value: $cardioDurationMinutes,
+                            in: 5...600,
+                            step: 5
+                        )
+                    }
+                }
+
                 Section {
                     ZStack(alignment: .topLeading) {
                         if notes.isEmpty {
-                            Text("例如：60 kg × 8 次 × 4 组")
+                            Text(exercise.isBuiltInActivity
+                                 ? "例如：自由泳，1,000 m"
+                                 : (exercise.isCardio
+                                    ? "例如：轻松跑，5 km"
+                                    : "例如：60 kg × 8 次 × 4 组"))
                                 .foregroundStyle(.tertiary)
                                 .padding(.horizontal, 5)
                                 .padding(.vertical, 8)
@@ -328,7 +344,11 @@ private struct AddTrainingEntrySheet: View {
                 } header: {
                     Text("训练记录")
                 } footer: {
-                    Text("重量、次数和组数暂时作为自由文本记录。")
+                    Text(exercise.isBuiltInActivity
+                         ? "可在备注中记录距离、泳姿或配速。"
+                         : (exercise.isCardio
+                            ? "可在备注中记录距离、配速或阻力。"
+                            : "重量、次数和组数暂时作为自由文本记录。"))
                 }
 
                 Section("训练日期") {
@@ -346,7 +366,11 @@ private struct AddTrainingEntrySheet: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("加入") {
-                        training.add(exercise, notes: notes)
+                        training.add(
+                            exercise,
+                            notes: notes,
+                            cardioDurationMinutes: exercise.isCardio ? cardioDurationMinutes : nil
+                        )
                         dismiss()
                     }
                 }
@@ -367,6 +391,22 @@ struct TrainingView: View {
     private var trainingDates: [Date] {
         Set(training.entries.map { Calendar.current.startOfDay(for: $0.date) })
             .sorted(by: >)
+    }
+
+    private var cardioTrainingDates: Set<Date> {
+        let cardioExerciseIDs = Set(store.exercises.filter(\.isCardio).map(\.id))
+        return Set(training.entries.compactMap { entry in
+            guard cardioExerciseIDs.contains(entry.exerciseID) else { return nil }
+            return Calendar.current.startOfDay(for: entry.date)
+        })
+    }
+
+    private var strengthTrainingDates: Set<Date> {
+        let cardioExerciseIDs = Set(store.exercises.filter(\.isCardio).map(\.id))
+        return Set(training.entries.compactMap { entry in
+            guard !cardioExerciseIDs.contains(entry.exerciseID) else { return nil }
+            return Calendar.current.startOfDay(for: entry.date)
+        })
     }
 
     var body: some View {
@@ -458,7 +498,8 @@ struct TrainingView: View {
                 TrainingCalendar(
                     visibleMonth: $visibleMonth,
                     selectedDate: $selectedDate,
-                    trainingDates: Set(trainingDates)
+                    strengthTrainingDates: strengthTrainingDates,
+                    cardioTrainingDates: cardioTrainingDates
                 )
 
                 calendarSelection
@@ -560,7 +601,8 @@ private enum TrainingPresentationMode {
 private struct TrainingCalendar: View {
     @Binding var visibleMonth: Date
     @Binding var selectedDate: Date?
-    let trainingDates: Set<Date>
+    let strengthTrainingDates: Set<Date>
+    let cardioTrainingDates: Set<Date>
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
@@ -570,8 +612,12 @@ private struct TrainingCalendar: View {
         return calendar
     }
 
-    private var normalizedTrainingDates: Set<Date> {
-        Set(trainingDates.map { calendar.startOfDay(for: $0) })
+    private var normalizedStrengthTrainingDates: Set<Date> {
+        Set(strengthTrainingDates.map { calendar.startOfDay(for: $0) })
+    }
+
+    private var normalizedCardioTrainingDates: Set<Date> {
+        Set(cardioTrainingDates.map { calendar.startOfDay(for: $0) })
     }
 
     private var weekdaySymbols: [String] {
@@ -622,7 +668,7 @@ private struct TrainingCalendar: View {
                         dayButton(date)
                     } else {
                         Color.clear
-                            .frame(height: 42)
+                            .frame(height: 50)
                     }
                 }
             }
@@ -663,7 +709,9 @@ private struct TrainingCalendar: View {
     private func dayButton(_ date: Date) -> some View {
         let isSelected = selectedDate.map { calendar.isDate($0, inSameDayAs: date) } ?? false
         let isToday = calendar.isDateInToday(date)
-        let hasTraining = normalizedTrainingDates.contains(calendar.startOfDay(for: date))
+        let day = calendar.startOfDay(for: date)
+        let hasStrengthTraining = normalizedStrengthTrainingDates.contains(day)
+        let hasCardioTraining = normalizedCardioTrainingDates.contains(day)
 
         return Button {
             selectedDate = calendar.startOfDay(for: date)
@@ -681,19 +729,50 @@ private struct TrainingCalendar: View {
                         }
                     }
 
-                Circle()
-                    .fill(hasTraining ? Color.accentColor : Color.clear)
-                    .frame(width: 5, height: 5)
+                HStack(spacing: 3) {
+                    if hasStrengthTraining {
+                        Circle()
+                            .fill(Color.blue)
+                            .frame(width: 5, height: 5)
+                    }
+
+                    if hasCardioTraining {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 5, height: 5)
+                    }
+                }
+                .frame(height: 5)
             }
-            .frame(maxWidth: .infinity, minHeight: 42)
+            .frame(maxWidth: .infinity, minHeight: 50)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(dayAccessibilityLabel(date, hasTraining: hasTraining))
+        .accessibilityLabel(
+            dayAccessibilityLabel(
+                date,
+                hasStrengthTraining: hasStrengthTraining,
+                hasCardioTraining: hasCardioTraining
+            )
+        )
     }
 
-    private func dayAccessibilityLabel(_ date: Date, hasTraining: Bool) -> String {
+    private func dayAccessibilityLabel(
+        _ date: Date,
+        hasStrengthTraining: Bool,
+        hasCardioTraining: Bool
+    ) -> String {
         let dateText = L10n.formattedDate(date)
-        return hasTraining ? "\(dateText)，\(L10n.string("有训练记录"))" : dateText
+
+        if hasStrengthTraining && hasCardioTraining {
+            return "\(dateText)，\(L10n.string("有力量训练和心肺训练"))"
+        }
+        if hasCardioTraining {
+            return "\(dateText)，\(L10n.string("有心肺训练"))"
+        }
+        if hasStrengthTraining {
+            return "\(dateText)，\(L10n.string("有力量训练"))"
+        }
+        return dateText
     }
 
     private func changeMonth(by offset: Int) {
@@ -718,6 +797,23 @@ private struct TrainingSessionRow: View {
         muscleSummary(for: entries, exercises: exercises)
     }
 
+    private var cardioMinutes: Int {
+        entries.compactMap(\.cardioDurationMinutes).reduce(0, +)
+    }
+
+    private var cardioExerciseNames: [String] {
+        let exercisesByID = Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+        return entries.reduce(into: [String]()) { result, entry in
+            guard let exercise = exercisesByID[entry.exerciseID], exercise.isCardio else {
+                return
+            }
+            let name = exercise.localizedName
+            if !result.contains(name) {
+                result.append(name)
+            }
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
@@ -732,6 +828,23 @@ private struct TrainingSessionRow: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+
+            if !cardioExerciseNames.isEmpty {
+                VStack(alignment: .leading, spacing: 3) {
+                    Label(
+                        cardioMinutes > 0
+                            ? L10n.format("有氧 %ld 分钟", cardioMinutes)
+                            : L10n.string("有氧训练"),
+                        systemImage: "figure.run"
+                    )
+                    .foregroundStyle(Color.accentColor)
+
+                    Text(cardioExerciseNames.prefix(3).joined(separator: L10n.listSeparator))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .font(.subheadline)
+            }
 
             VStack(alignment: .leading, spacing: 3) {
                 Text("主要肌群")
@@ -772,6 +885,7 @@ private struct TrainingSessionDetailView: View {
     @State private var isShowingImportError = false
     @State private var isImportingPhotos = false
     @State private var copiedEntryCount = 0
+    @State private var shareImage: UIImage?
 
     private var entries: [TrainingEntry] {
         training.entries.filter {
@@ -787,6 +901,10 @@ private struct TrainingSessionDetailView: View {
         muscleSummary(for: entries, exercises: store.exercises)
     }
 
+    private var cardioMinutes: Int {
+        entries.compactMap(\.cardioDurationMinutes).reduce(0, +)
+    }
+
     var body: some View {
         List {
             Section("训练概览") {
@@ -796,6 +914,13 @@ private struct TrainingSessionDetailView: View {
                     displayedComponents: .date
                 )
                 LabeledContent("动作数量", value: L10n.format("%ld 个", entries.count))
+
+                if cardioMinutes > 0 {
+                    LabeledContent(
+                        "有氧时长",
+                        value: L10n.format("%ld 分钟", cardioMinutes)
+                    )
+                }
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text("主要肌群")
@@ -851,7 +976,17 @@ private struct TrainingSessionDetailView: View {
         }
         .navigationTitle("训练详情")
         .navigationBarTitleDisplayMode(.inline)
+        .background(ShareSheetPresenter(image: $shareImage))
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    shareImage = makeShareImage()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(L10n.string("分享训练长图"))
+            }
+
             if !Calendar.current.isDateInToday(date) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -902,7 +1037,10 @@ private struct TrainingSessionDetailView: View {
             }
         }
         .sheet(item: $entryToEdit) { entry in
-            EditTrainingEntrySheet(entry: entry)
+            EditTrainingEntrySheet(
+                entry: entry,
+                exercise: exercise(for: entry)
+            )
         }
         .sheet(item: $selectedPhoto) { photo in
             TrainingPhotoDetail(photo: photo)
@@ -977,6 +1115,176 @@ private struct TrainingSessionDetailView: View {
 
     private func exercise(for entry: TrainingEntry) -> Exercise? {
         store.exercises.first { $0.id == entry.exerciseID }
+    }
+
+    @MainActor
+    private func makeShareImage() -> UIImage? {
+        let renderer = ImageRenderer(
+            content: TrainingShareCard(
+                date: date,
+                entries: entries,
+                exercises: store.exercises,
+                photoURLs: photos.map(training.url(for:))
+            )
+            .environment(\.colorScheme, .light)
+            .environment(\.locale, L10n.language.locale)
+        )
+        renderer.proposedSize = ProposedViewSize(width: 390, height: nil)
+        renderer.scale = 2
+        return renderer.uiImage
+    }
+}
+
+private struct TrainingShareCard: View {
+    let date: Date
+    let entries: [TrainingEntry]
+    let exercises: [Exercise]
+    let photoURLs: [URL]
+
+    private var exercisesByID: [String: Exercise] {
+        Dictionary(uniqueKeysWithValues: exercises.map { ($0.id, $0) })
+    }
+
+    private var muscles: [MuscleSummaryItem] {
+        muscleSummary(for: entries, exercises: exercises)
+    }
+
+    private var cardioMinutes: Int {
+        entries.compactMap(\.cardioDurationMinutes).reduce(0, +)
+    }
+
+    private var muscleText: String {
+        guard !muscles.isEmpty else {
+            return L10n.string("暂无肌群信息")
+        }
+
+        return muscles.map { muscle in
+            muscle.count > 1 ? "\(muscle.name) × \(muscle.count)" : muscle.name
+        }.joined(separator: L10n.listSeparator)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            Label("FitS", systemImage: "figure.strengthtraining.traditional")
+                .font(.headline)
+                .foregroundStyle(.tint)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(L10n.string("训练记录"))
+                    .font(.largeTitle.bold())
+                Text(L10n.formattedDate(date))
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                shareSummaryRow(
+                    title: L10n.string("动作数量"),
+                    value: L10n.format("%ld 个", entries.count)
+                )
+
+                if cardioMinutes > 0 {
+                    shareSummaryRow(
+                        title: L10n.string("有氧时长"),
+                        value: L10n.format("%ld 分钟", cardioMinutes)
+                    )
+                }
+
+                shareSummaryRow(
+                    title: L10n.string("主要肌群"),
+                    value: muscleText
+                )
+            }
+            .padding(16)
+            .background(Color(.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16))
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text(L10n.string("训练动作"))
+                    .font(.title2.bold())
+
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    shareEntry(entry, number: index + 1)
+
+                    if entry.id != entries.last?.id {
+                        Divider()
+                    }
+                }
+            }
+
+            if !photoURLs.isEmpty {
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(L10n.string("训练图片"))
+                        .font(.title2.bold())
+
+                    Grid(horizontalSpacing: 10, verticalSpacing: 10) {
+                        ForEach(Array(stride(from: 0, to: photoURLs.count, by: 2)), id: \.self) { index in
+                            GridRow {
+                                sharePhoto(photoURLs[index])
+
+                                if index + 1 < photoURLs.count {
+                                    sharePhoto(photoURLs[index + 1])
+                                } else {
+                                    Color.clear
+                                        .frame(height: 160)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(width: 390, alignment: .leading)
+        .background(Color.white)
+    }
+
+    private func shareSummaryRow(title: String, value: String) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 12)
+            Text(value)
+                .fontWeight(.semibold)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func shareEntry(_ entry: TrainingEntry, number: Int) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Text("\(number)")
+                .font(.caption.bold())
+                .foregroundStyle(.white)
+                .frame(width: 24, height: 24)
+                .background(.tint, in: Circle())
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(exercisesByID[entry.exerciseID]?.localizedName ?? entry.exerciseName)
+                    .font(.headline)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                if let minutes = entry.cardioDurationMinutes {
+                    Label(L10n.format("%ld 分钟", minutes), systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(Color.accentColor)
+                }
+
+                if !entry.notes.isEmpty {
+                    Text(entry.notes)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func sharePhoto(_ url: URL) -> some View {
+        TrainingPhotoImage(url: url, contentMode: .fill)
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 
@@ -1133,6 +1441,12 @@ private struct TrainingEntryRow: View {
                 .font(.headline)
                 .foregroundStyle(.primary)
 
+            if let minutes = entry.cardioDurationMinutes {
+                Label(L10n.format("%ld 分钟", minutes), systemImage: "clock")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.accentColor)
+            }
+
             if !entry.notes.isEmpty {
                 Text(entry.notes)
                     .foregroundStyle(.secondary)
@@ -1145,16 +1459,20 @@ private struct TrainingEntryRow: View {
 
 private struct EditTrainingEntrySheet: View {
     let entry: TrainingEntry
+    let exercise: Exercise?
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var training: TrainingStore
     @State private var notes: String
     @State private var date: Date
+    @State private var cardioDurationMinutes: Int
 
-    init(entry: TrainingEntry) {
+    init(entry: TrainingEntry, exercise: Exercise?) {
         self.entry = entry
+        self.exercise = exercise
         _notes = State(initialValue: entry.notes)
         _date = State(initialValue: entry.date)
+        _cardioDurationMinutes = State(initialValue: entry.cardioDurationMinutes ?? 30)
     }
 
     var body: some View {
@@ -1165,13 +1483,28 @@ private struct EditTrainingEntrySheet: View {
                         .font(.headline)
                 }
 
+                if isCardio {
+                    Section("有氧记录") {
+                        Stepper(
+                            L10n.format("%ld 分钟", cardioDurationMinutes),
+                            value: $cardioDurationMinutes,
+                            in: 5...600,
+                            step: 5
+                        )
+                    }
+                }
+
                 Section {
                     TextEditor(text: $notes)
                         .frame(minHeight: 120)
                 } header: {
                     Text("训练记录")
                 } footer: {
-                    Text("重量、次数和组数暂时作为自由文本记录。")
+                    Text(exercise?.isBuiltInActivity == true
+                         ? "可在备注中记录距离、泳姿或配速。"
+                         : (isCardio
+                            ? "可在备注中记录距离、配速或阻力。"
+                            : "重量、次数和组数暂时作为自由文本记录。"))
                 }
 
                 Section("训练日期") {
@@ -1189,12 +1522,21 @@ private struct EditTrainingEntrySheet: View {
 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        training.update(entry, date: date, notes: notes)
+                        training.update(
+                            entry,
+                            date: date,
+                            notes: notes,
+                            cardioDurationMinutes: isCardio ? cardioDurationMinutes : nil
+                        )
                         dismiss()
                     }
                 }
             }
         }
+    }
+
+    private var isCardio: Bool {
+        exercise?.isCardio == true || entry.cardioDurationMinutes != nil
     }
 }
 
@@ -1293,7 +1635,10 @@ private struct ExerciseRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            LocalExerciseImage(path: exercise.image)
+            LocalExerciseImage(
+                path: exercise.image,
+                systemImage: exercise.mediaPlaceholderSystemImage
+            )
                 .frame(width: 72, height: 72)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
 

@@ -8,7 +8,8 @@ the English version.
 
 FitS is a local-first SwiftUI exercise browser and workout log for iOS 17+.
 The app is bilingual (Simplified Chinese and English), has no account or server,
-and currently ships 1,324 exercises and their media in the app bundle.
+and currently ships 1,324 dataset exercises and their media in the app bundle,
+plus clearly identified FitS built-in cardio activities without third-party media.
 
 The core user flow is:
 
@@ -16,8 +17,8 @@ The core user flow is:
 2. Filter by body part and equipment.
 3. Read bilingual exercise details and view alternatives.
 4. Favorite an exercise or add it to today's workout.
-5. Review workouts by list or calendar, then edit, copy, move, photograph, or
-   delete a workout.
+5. Review workouts by list or calendar, then edit, copy, move, photograph,
+   share, or delete a workout.
 
 This is an open-source personal project. Exercise guidance is informational, not
 medical advice.
@@ -124,11 +125,22 @@ Preserve these behaviors unless the user explicitly requests a change.
 - Calendar meaning:
   - accent-colored bold number = today;
   - filled circle = selected day;
-  - small dot = a day containing a workout.
+  - blue dot = a day containing strength training;
+  - red dot = a day containing cardio training;
+  - both dots = a day containing both training types.
 - Selecting a marked day shows a workout summary, which opens workout detail.
 - Workout notes are intentionally free-form text for weight, reps, and sets.
+- Dataset exercises in the `cardio` category use a structured duration in
+  minutes in addition to free-form notes for distance, pace, or resistance.
+- FitS built-in cardio activities use IDs prefixed with `fits-activity-`. They
+  must be identified as built-in on detail pages and must not claim dataset
+  instructions, attribution, or third-party media.
+- Calendar days use blue and red dots to distinguish strength and cardio;
+  cardio duration remains visible in the selected-day summary and detail.
 - Copying a workout copies entries and notes, but intentionally does not copy
   photos.
+- Workout detail can be shared as a generated long image containing its summary,
+  exercise notes, and attached photos.
 - `删除训练` deletes the whole workout session for that date, including photos,
   after confirmation. Individual exercise entries still have their own delete
   action.
@@ -212,4 +224,3 @@ Before ending an agent task, report:
 - validation performed and any unverified cases;
 - whether changes were committed or pushed;
 - any unrelated files intentionally left untouched.
-

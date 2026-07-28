@@ -25,7 +25,10 @@ final class ExerciseStore: ObservableObject {
 
             exercises = try await Task.detached(priority: .userInitiated) {
                 let data = try Data(contentsOf: url)
-                return try JSONDecoder().decode([Exercise].self, from: data)
+                let datasetExercises = try JSONDecoder().decode([Exercise].self, from: data)
+                return (datasetExercises + Exercise.builtInActivities).sorted {
+                    $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
             }.value
         } catch {
             errorMessage = error.localizedDescription
@@ -66,6 +69,7 @@ struct TrainingEntry: Codable, Identifiable, Hashable {
     let exerciseName: String
     let date: Date
     let notes: String
+    let cardioDurationMinutes: Int?
 }
 
 struct TrainingPhoto: Codable, Identifiable, Hashable {
@@ -102,21 +106,32 @@ final class TrainingStore: ObservableObject {
         }
     }
 
-    func add(_ exercise: Exercise, notes: String, date: Date = .now) {
+    func add(
+        _ exercise: Exercise,
+        notes: String,
+        cardioDurationMinutes: Int? = nil,
+        date: Date = .now
+    ) {
         entries.insert(
             TrainingEntry(
                 id: UUID(),
                 exerciseID: exercise.id,
                 exerciseName: exercise.localizedName,
                 date: date,
-                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+                cardioDurationMinutes: exercise.isCardio ? cardioDurationMinutes : nil
             ),
             at: 0
         )
         save()
     }
 
-    func update(_ entry: TrainingEntry, date: Date, notes: String) {
+    func update(
+        _ entry: TrainingEntry,
+        date: Date,
+        notes: String,
+        cardioDurationMinutes: Int? = nil
+    ) {
         guard let index = entries.firstIndex(where: { $0.id == entry.id }) else {
             return
         }
@@ -126,7 +141,8 @@ final class TrainingStore: ObservableObject {
             exerciseID: entry.exerciseID,
             exerciseName: entry.exerciseName,
             date: date,
-            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines),
+            cardioDurationMinutes: cardioDurationMinutes
         )
         entries.sort { $0.date > $1.date }
         save()
@@ -172,7 +188,8 @@ final class TrainingStore: ObservableObject {
                 exerciseID: entry.exerciseID,
                 exerciseName: entry.exerciseName,
                 date: entry.date.addingTimeInterval(offset),
-                notes: entry.notes
+                notes: entry.notes,
+                cardioDurationMinutes: entry.cardioDurationMinutes
             )
         }
         photos = photos.map { photo in
@@ -209,7 +226,8 @@ final class TrainingStore: ObservableObject {
                 exerciseID: entry.exerciseID,
                 exerciseName: entry.exerciseName,
                 date: targetDate.addingTimeInterval(Double(index) / 1000),
-                notes: entry.notes
+                notes: entry.notes,
+                cardioDurationMinutes: entry.cardioDurationMinutes
             )
         }
 

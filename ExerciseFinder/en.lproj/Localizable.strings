@@ -25,6 +25,15 @@
 "目标：%@" = "Target: %@";
 
 "例如：60 kg × 8 次 × 4 组" = "Example: 60 kg × 8 reps × 4 sets";
+"例如：轻松跑，5 km" = "Example: easy run, 5 km";
+"例如：自由泳，1,000 m" = "Example: freestyle, 1,000 m";
+"有氧记录" = "Cardio";
+"%ld 分钟" = "%ld min";
+"有氧 %ld 分钟" = "%ld min cardio";
+"有氧时长" = "Cardio Duration";
+"有氧训练" = "Cardio";
+"可在备注中记录距离、配速或阻力。" = "Use notes for distance, pace, or resistance.";
+"可在备注中记录距离、泳姿或配速。" = "Use notes for distance, stroke, or pace.";
 "训练记录" = "Workouts";
 "重量、次数和组数暂时作为自由文本记录。" = "Record weight, reps, and sets as free-form notes.";
 "训练日期" = "Workout Date";
@@ -48,6 +57,7 @@
 "训练图片" = "Workout Photos";
 "编辑" = "Edit";
 "训练详情" = "Workout Details";
+"分享训练长图" = "Share Workout Image";
 "将整次训练复制到今天" = "Copy entire workout to today";
 "为这次训练添加图片" = "Add photos to this workout";
 "已复制到今天" = "Copied to Today";
@@ -75,3 +85,6 @@
 "选择带标记的日期查看训练记录。" = "Select a marked date to view its workout.";
 "当日没有训练记录" = "No workout recorded on this date";
 "有训练记录" = "Workout recorded";
+"有力量训练" = "Strength workout recorded";
+"有心肺训练" = "Cardio workout recorded";
+"有力量训练和心肺训练" = "Strength and cardio workouts recorded";

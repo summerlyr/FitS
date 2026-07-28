@@ -29,51 +29,67 @@ struct ExerciseDetailView: View {
                 }
                 .pickerStyle(.segmented)
 
-                LocalGIFView(path: exercise.gifURL)
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(1, contentMode: .fit)
-                    .background(Color(.secondarySystemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                if exercise.isBuiltInActivity {
+                    BuiltInActivityHero(systemImage: exercise.mediaPlaceholderSystemImage)
+                } else {
+                    LocalGIFView(path: exercise.gifURL)
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(1, contentMode: .fit)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                }
 
                 VStack(alignment: .leading, spacing: 12) {
                     DetailItem(title: language.bodyPartTitle, value: value(exercise.bodyPart))
                     DetailItem(title: language.equipmentTitle, value: value(exercise.equipment))
                     DetailItem(title: language.targetTitle, value: value(exercise.target))
-                    DetailItem(title: language.muscleGroupTitle, value: value(exercise.muscleGroup))
-                    DetailItem(
-                        title: language.secondaryMusclesTitle,
-                        value: exercise.secondaryMuscles
-                            .map(value)
-                            .joined(separator: language.listSeparator)
-                    )
+                    if !exercise.isBuiltInActivity {
+                        DetailItem(title: language.muscleGroupTitle, value: value(exercise.muscleGroup))
+                        DetailItem(
+                            title: language.secondaryMusclesTitle,
+                            value: exercise.secondaryMuscles
+                                .map(value)
+                                .joined(separator: language.listSeparator)
+                        )
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
-                    Text(language.instructionsTitle)
+                    Text(exercise.isBuiltInActivity
+                         ? language.builtInActivityTitle
+                         : language.instructionsTitle)
                         .font(.title2.bold())
 
-                    ForEach(
-                        Array(instructions.enumerated()),
-                        id: \.offset
-                    ) { index, instruction in
-                        HStack(alignment: .top, spacing: 12) {
-                            Text("\(index + 1)")
-                                .font(.caption.bold())
-                                .foregroundStyle(.white)
-                                .frame(width: 24, height: 24)
-                                .background(.tint, in: Circle())
+                    if exercise.isBuiltInActivity {
+                        Text(language.builtInActivityDescription)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        ForEach(
+                            Array(instructions.enumerated()),
+                            id: \.offset
+                        ) { index, instruction in
+                            HStack(alignment: .top, spacing: 12) {
+                                Text("\(index + 1)")
+                                    .font(.caption.bold())
+                                    .foregroundStyle(.white)
+                                    .frame(width: 24, height: 24)
+                                    .background(.tint, in: Circle())
 
-                            Text(instruction)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                Text(instruction)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
                         }
                     }
                 }
 
-                Text(exercise.attribution)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if !exercise.attribution.isEmpty {
+                    Text(exercise.attribution)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
 
-                if !alternativeExercises.isEmpty {
+                if !exercise.isBuiltInActivity && !alternativeExercises.isEmpty {
                     Divider()
 
                     VStack(alignment: .leading, spacing: 12) {
@@ -219,7 +235,7 @@ struct ExerciseDetailView: View {
     }
 }
 
-private struct ShareSheetPresenter: UIViewControllerRepresentable {
+struct ShareSheetPresenter: UIViewControllerRepresentable {
     @Binding var image: UIImage?
 
     func makeCoordinator() -> Coordinator {
@@ -269,6 +285,12 @@ private enum DetailLanguage: String, CaseIterable, Identifiable {
     var muscleGroupTitle: String { self == .chinese ? "协同肌群" : "Muscle Group" }
     var secondaryMusclesTitle: String { self == .chinese ? "辅助肌群" : "Secondary Muscles" }
     var instructionsTitle: String { self == .chinese ? "动作步骤" : "Instructions" }
+    var builtInActivityTitle: String { self == .chinese ? "关于这个活动" : "About This Activity" }
+    var builtInActivityDescription: String {
+        self == .chinese
+            ? "这是 FitS 内置的有氧活动，不属于原始动作数据集。加入训练后，可以记录游泳时长，并在备注中填写距离、泳姿或配速。"
+            : "This is a FitS built-in cardio activity, not part of the original exercise dataset. Add it to a workout to record duration, and use notes for distance, stroke, or pace."
+    }
     var alternativesTitle: String { self == .chinese ? "替代动作" : "Alternatives" }
     var alternativesSubtitle: String {
         self == .chinese
@@ -285,7 +307,10 @@ private struct AlternativeExerciseRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            LocalExerciseImage(path: exercise.image)
+            LocalExerciseImage(
+                path: exercise.image,
+                systemImage: exercise.mediaPlaceholderSystemImage
+            )
                 .frame(width: 72, height: 72)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -358,47 +383,64 @@ private struct ExerciseShareCard: View {
                 .font(.largeTitle.bold())
                 .fixedSize(horizontal: false, vertical: true)
 
-            LocalExerciseImage(path: exercise.image)
-                .frame(height: 342)
-                .clipShape(RoundedRectangle(cornerRadius: 18))
+            if exercise.isBuiltInActivity {
+                BuiltInActivityHero(systemImage: exercise.mediaPlaceholderSystemImage)
+                    .frame(height: 220)
+            } else {
+                LocalExerciseImage(path: exercise.image)
+                    .frame(height: 342)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+            }
 
             VStack(alignment: .leading, spacing: 12) {
                 DetailItem(title: language.bodyPartTitle, value: value(exercise.bodyPart))
                 DetailItem(title: language.equipmentTitle, value: value(exercise.equipment))
                 DetailItem(title: language.targetTitle, value: value(exercise.target))
-                DetailItem(title: language.muscleGroupTitle, value: value(exercise.muscleGroup))
-                DetailItem(
-                    title: language.secondaryMusclesTitle,
-                    value: exercise.secondaryMuscles
-                        .map(value)
-                        .joined(separator: language.listSeparator)
-                )
+                if !exercise.isBuiltInActivity {
+                    DetailItem(title: language.muscleGroupTitle, value: value(exercise.muscleGroup))
+                    DetailItem(
+                        title: language.secondaryMusclesTitle,
+                        value: exercise.secondaryMuscles
+                            .map(value)
+                            .joined(separator: language.listSeparator)
+                    )
+                }
             }
 
             Divider()
 
             VStack(alignment: .leading, spacing: 14) {
-                Text(language.instructionsTitle)
+                Text(exercise.isBuiltInActivity
+                     ? language.builtInActivityTitle
+                     : language.instructionsTitle)
                     .font(.title2.bold())
 
-                ForEach(Array(instructions.enumerated()), id: \.offset) { index, instruction in
-                    HStack(alignment: .top, spacing: 12) {
-                        Text("\(index + 1)")
-                            .font(.caption.bold())
-                            .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
-                            .background(.tint, in: Circle())
+                if exercise.isBuiltInActivity {
+                    Text(language.builtInActivityDescription)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ForEach(Array(instructions.enumerated()), id: \.offset) { index, instruction in
+                        HStack(alignment: .top, spacing: 12) {
+                            Text("\(index + 1)")
+                                .font(.caption.bold())
+                                .foregroundStyle(.white)
+                                .frame(width: 24, height: 24)
+                                .background(.tint, in: Circle())
 
-                        Text(instruction)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(instruction)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
                     }
                 }
             }
 
-            Text(exercise.attribution)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            if !exercise.attribution.isEmpty {
+                Text(exercise.attribution)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(24)
         .frame(width: 390, alignment: .leading)
@@ -428,6 +470,12 @@ private struct DetailItem: View {
 
 struct LocalExerciseImage: View {
     let path: String
+    let systemImage: String
+
+    init(path: String, systemImage: String = "figure.strengthtraining.traditional") {
+        self.path = path
+        self.systemImage = systemImage
+    }
 
     var body: some View {
         if let url = Bundle.main.resourceURL?.appending(path: path),
@@ -438,10 +486,28 @@ struct LocalExerciseImage: View {
         } else {
             ZStack {
                 Color(.secondarySystemBackground)
-                Image(systemName: "figure.strengthtraining.traditional")
+                Image(systemName: systemImage)
                     .foregroundStyle(.secondary)
             }
         }
+    }
+}
+
+private struct BuiltInActivityHero: View {
+    let systemImage: String
+
+    var body: some View {
+        ZStack {
+            Color(.secondarySystemBackground)
+            Image(systemName: systemImage)
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(Color.accentColor)
+                .padding(64)
+        }
+        .frame(maxWidth: .infinity)
+        .aspectRatio(1.45, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 18))
     }
 }
 
