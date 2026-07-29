@@ -11,6 +11,7 @@ struct ExerciseListView: View {
 
     @EnvironmentObject private var store: ExerciseStore
     @EnvironmentObject private var favorites: FavoritesStore
+    @EnvironmentObject private var language: LanguageStore
     @State private var searchText = ""
     @State private var isSearchPresented = false
     @State private var isVisible = false
@@ -18,6 +19,7 @@ struct ExerciseListView: View {
     @State private var exerciseToLog: Exercise?
     @State private var presentedExercise: Exercise?
     @State private var shouldRestoreSearchFocus = false
+    @State private var isShowingSettings = false
 
     private var bodyParts: [String] {
         ["全部部位"] + Set(store.exercises.map(\.bodyPart)).sorted()
@@ -51,6 +53,8 @@ struct ExerciseListView: View {
     }
 
     var body: some View {
+        let _ = language.language
+
         NavigationStack {
             Group {
                 if store.isLoading {
@@ -67,10 +71,20 @@ struct ExerciseListView: View {
             }
             .navigationTitle(L10n.string(showsFavoritesOnly ? "我的收藏" : "训练动作"))
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItemGroup(placement: .topBarTrailing) {
                     AppLanguageButton()
+
+                    Button {
+                        isShowingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel(L10n.string("设置"))
                 }
             }
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsView()
         }
         .modifier(
             SearchConfiguration(
@@ -107,6 +121,7 @@ struct ExerciseListView: View {
             } else {
                 ForEach(filteredExercises) { exercise in
                     exerciseLink(for: exercise)
+                    .id(language.language.rawValue)
                     .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                         Button {
                             exerciseToLog = exercise
@@ -382,11 +397,13 @@ private struct AddTrainingEntrySheet: View {
 struct TrainingView: View {
     @EnvironmentObject private var training: TrainingStore
     @EnvironmentObject private var store: ExerciseStore
+    @EnvironmentObject private var language: LanguageStore
     @State private var presentationMode = TrainingPresentationMode.calendar
     @State private var visibleMonth = Calendar.current.dateInterval(of: .month, for: .now)?.start ?? .now
     @State private var selectedDate: Date?
     @State private var sessionDateToDelete: Date?
     @State private var isShowingSessionDeleteConfirmation = false
+    @State private var isShowingSettings = false
 
     private var trainingDates: [Date] {
         Set(training.entries.map { Calendar.current.startOfDay(for: $0.date) })
@@ -410,6 +427,8 @@ struct TrainingView: View {
     }
 
     var body: some View {
+        let _ = language.language
+
         NavigationStack {
             Group {
                 switch presentationMode {
@@ -419,7 +438,7 @@ struct TrainingView: View {
                     listView
                 }
             }
-            .navigationTitle("训练记录")
+            .navigationTitle(L10n.string("训练记录"))
             .toolbar {
                 ToolbarItemGroup(placement: .topBarTrailing) {
                     Button {
@@ -430,8 +449,18 @@ struct TrainingView: View {
                     .accessibilityLabel(L10n.string(presentationMode.toggleLabel))
 
                     AppLanguageButton()
+
+                    Button {
+                        isShowingSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .accessibilityLabel(L10n.string("设置"))
                 }
             }
+        }
+        .sheet(isPresented: $isShowingSettings) {
+            SettingsView()
         }
         .task {
             await store.load()
@@ -475,6 +504,7 @@ struct TrainingView: View {
                                 photoCount: training.photos(on: date).count
                             )
                         }
+                        .id(language.language.rawValue)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
                                 sessionDateToDelete = date
@@ -581,6 +611,213 @@ struct TrainingView: View {
     }
 }
 
+struct SettingsView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var training: TrainingStore
+    @EnvironmentObject private var favorites: FavoritesStore
+    @State private var backupShareItem: BackupShareItem?
+    @State private var temporaryBackupURL: URL?
+    @State private var pendingBackup: FitSBackup?
+    @State private var isImportingBackup = false
+    @State private var isShowingRestoreConfirmation = false
+    @State private var backupNotice: BackupNotice?
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Button {
+                        prepareBackupExport()
+                    } label: {
+                        Label("导出备份", systemImage: "square.and.arrow.up")
+                    }
+
+                    Button {
+                        isImportingBackup = true
+                    } label: {
+                        Label("导入备份", systemImage: "square.and.arrow.down")
+                    }
+                } header: {
+                    Text("数据备份")
+                } footer: {
+                    Text("备份包含收藏、训练记录和训练图片。导入会覆盖当前数据。")
+                }
+            }
+            .navigationTitle(L10n.string("设置"))
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .sheet(item: $backupShareItem, onDismiss: {
+            if let temporaryBackupURL {
+                try? FileManager.default.removeItem(at: temporaryBackupURL)
+                self.temporaryBackupURL = nil
+            }
+        }) { item in
+            BackupShareSheet(url: item.url)
+        }
+        .fileImporter(
+            isPresented: $isImportingBackup,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            handleBackupImport(result)
+        }
+        .alert(
+            "恢复备份？",
+            isPresented: $isShowingRestoreConfirmation,
+            presenting: pendingBackup
+        ) { backup in
+            Button("导入并覆盖", role: .destructive) {
+                restore(backup)
+            }
+            Button("取消", role: .cancel) {
+                pendingBackup = nil
+            }
+        } message: { backup in
+            Text(restoreConfirmationMessage(for: backup))
+        }
+        .alert(item: $backupNotice) { notice in
+            Alert(
+                title: Text(notice.title),
+                message: Text(notice.message),
+                dismissButton: .default(Text("好"))
+            )
+        }
+    }
+
+    private var backupFileName: String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HHmm"
+        return "FitS-Backup-\(formatter.string(from: .now))"
+    }
+
+    private func prepareBackupExport() {
+        do {
+            let backup = FitSBackup(
+                favoriteExerciseIDs: favorites.exerciseIDs.sorted(),
+                trainingEntries: training.entries,
+                trainingPhotos: try training.backupPhotos()
+            )
+            let backupDirectory = FileManager.default.temporaryDirectory.appending(
+                path: "FitSBackups",
+                directoryHint: .isDirectory
+            )
+            try FileManager.default.createDirectory(
+                at: backupDirectory,
+                withIntermediateDirectories: true
+            )
+            let backupURL = backupDirectory
+                .appending(path: backupFileName)
+                .appendingPathExtension("json")
+            try backup.encoded().write(to: backupURL, options: .atomic)
+            temporaryBackupURL = backupURL
+            backupShareItem = BackupShareItem(url: backupURL)
+        } catch {
+            backupNotice = BackupNotice(
+                title: L10n.string("无法导出备份"),
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func handleBackupImport(_ result: Result<[URL], Error>) {
+        do {
+            guard let url = try result.get().first else {
+                return
+            }
+
+            let isAccessing = url.startAccessingSecurityScopedResource()
+            defer {
+                if isAccessing {
+                    url.stopAccessingSecurityScopedResource()
+                }
+            }
+
+            let fileSize = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+            guard fileSize <= FitSBackup.maximumFileSize else {
+                throw FitSBackupError.fileTooLarge
+            }
+            pendingBackup = try FitSBackup.decode(
+                from: Data(contentsOf: url, options: .mappedIfSafe)
+            )
+            isShowingRestoreConfirmation = true
+        } catch {
+            if (error as NSError).code != NSUserCancelledError {
+                backupNotice = BackupNotice(
+                    title: L10n.string("无法导入备份"),
+                    message: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func restore(_ backup: FitSBackup) {
+        do {
+            try training.restore(from: backup)
+            favorites.replace(with: Set(backup.favoriteExerciseIDs))
+            pendingBackup = nil
+            backupNotice = BackupNotice(
+                title: L10n.string("备份已恢复"),
+                message: backup.includesPhotos
+                    ? L10n.string("收藏、训练记录和训练图片已恢复。")
+                    : L10n.string("收藏和训练记录已恢复，设备上的训练图片保持不变。")
+            )
+        } catch {
+            backupNotice = BackupNotice(
+                title: L10n.string("无法恢复备份"),
+                message: error.localizedDescription
+            )
+        }
+    }
+
+    private func restoreConfirmationMessage(for backup: FitSBackup) -> String {
+        if backup.includesPhotos {
+            return L10n.format(
+                "此备份包含 %ld 条训练记录、%ld 个收藏和 %ld 张图片。导入后会覆盖当前训练、收藏和训练图片。",
+                backup.trainingEntries.count,
+                backup.favoriteExerciseIDs.count,
+                backup.trainingPhotos.count
+            )
+        }
+
+        return L10n.format(
+            "此备份包含 %ld 条训练记录和 %ld 个收藏。导入后会覆盖当前训练与收藏，设备上的训练图片会保留。",
+            backup.trainingEntries.count,
+            backup.favoriteExerciseIDs.count
+        )
+    }
+}
+
+private struct BackupNotice: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
+
+private struct BackupShareItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct BackupShareSheet: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+
+    func updateUIViewController(
+        _ uiViewController: UIActivityViewController,
+        context: Context
+    ) {}
+}
+
 private enum TrainingPresentationMode {
     case calendar
     case list
@@ -604,9 +841,12 @@ private struct TrainingCalendar: View {
     let strengthTrainingDates: Set<Date>
     let cardioTrainingDates: Set<Date>
 
+    @EnvironmentObject private var language: LanguageStore
+
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 4), count: 7)
 
     private var calendar: Calendar {
+        _ = language.language
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = L10n.language.locale
         return calendar
@@ -793,6 +1033,8 @@ private struct TrainingSessionRow: View {
     let exercises: [Exercise]
     let photoCount: Int
 
+    @EnvironmentObject private var language: LanguageStore
+
     private var muscles: [MuscleSummaryItem] {
         muscleSummary(for: entries, exercises: exercises)
     }
@@ -815,6 +1057,8 @@ private struct TrainingSessionRow: View {
     }
 
     var body: some View {
+        let _ = language.language
+
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 14) {
                 Label(
@@ -886,6 +1130,7 @@ private struct TrainingSessionDetailView: View {
     @State private var isImportingPhotos = false
     @State private var copiedEntryCount = 0
     @State private var shareImage: UIImage?
+    @State private var selectedExercise: Exercise?
 
     private var entries: [TrainingEntry] {
         training.entries.filter {
@@ -943,29 +1188,7 @@ private struct TrainingSessionDetailView: View {
                 }
             }
 
-            Section("训练动作") {
-                ForEach(entries) { entry in
-                    TrainingEntryRow(
-                        entry: entry,
-                        exercise: exercise(for: entry)
-                    )
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button(role: .destructive) {
-                            entryToDelete = entry
-                            isShowingDeleteConfirmation = true
-                        } label: {
-                            Label("删除", systemImage: "trash")
-                        }
-
-                        Button {
-                            entryToEdit = entry
-                        } label: {
-                            Label("编辑", systemImage: "pencil")
-                        }
-                        .tint(.blue)
-                    }
-                }
-            }
+            trainingEntriesSection
 
             Section {
                 Button("删除训练", role: .destructive) {
@@ -974,19 +1197,14 @@ private struct TrainingSessionDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         }
+        .environment(\.editMode, .constant(.active))
         .navigationTitle("训练详情")
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $selectedExercise) { exercise in
+            ExerciseDetailView(exercise: exercise)
+        }
         .background(ShareSheetPresenter(image: $shareImage))
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    shareImage = makeShareImage()
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .accessibilityLabel(L10n.string("分享训练长图"))
-            }
-
             if !Calendar.current.isDateInToday(date) {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
@@ -1012,6 +1230,15 @@ private struct TrainingSessionDetailView: View {
                     }
                     .accessibilityLabel(L10n.string("为这次训练添加图片"))
                 }
+            }
+
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    shareImage = makeShareImage()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .accessibilityLabel(L10n.string("分享训练长图"))
             }
         }
         .onChange(of: selectedPhotoItems) { _, items in
@@ -1086,6 +1313,44 @@ private struct TrainingSessionDetailView: View {
                 entries.count,
                 photos.count
             ))
+        }
+    }
+
+    private var trainingEntriesSection: some View {
+        Section("训练动作") {
+            ForEach(entries) { entry in
+                let entryExercise = exercise(for: entry)
+
+                TrainingEntryRow(
+                    entry: entry,
+                    exercise: entryExercise,
+                    onSelect: {
+                        selectedExercise = entryExercise
+                    }
+                )
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    Button(role: .destructive) {
+                        entryToDelete = entry
+                        isShowingDeleteConfirmation = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+
+                    Button {
+                        entryToEdit = entry
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+                    .tint(.blue)
+                }
+            }
+            .onMove { offsets, destination in
+                training.moveEntries(
+                    on: date,
+                    fromOffsets: offsets,
+                    toOffset: destination
+                )
+            }
         }
     }
 
@@ -1422,14 +1687,15 @@ private struct TrainingPhotoImage: View {
 private struct TrainingEntryRow: View {
     let entry: TrainingEntry
     let exercise: Exercise?
+    let onSelect: () -> Void
 
     var body: some View {
-        if let exercise {
-            NavigationLink {
-                ExerciseDetailView(exercise: exercise)
-            } label: {
+        if exercise != nil {
+            Button(action: onSelect) {
                 content
+                    .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
         } else {
             content
         }
@@ -1453,6 +1719,7 @@ private struct TrainingEntryRow: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 4)
     }
 }
@@ -1594,6 +1861,8 @@ private struct FilterMenu: View {
     let options: [String]
     @Binding var selection: String
 
+    @EnvironmentObject private var language: LanguageStore
+
     var body: some View {
         Menu {
             Picker(title, selection: $selection) {
@@ -1623,6 +1892,7 @@ private struct FilterMenu: View {
     }
 
     private func localized(_ value: String) -> String {
+        _ = language.language
         if value.hasPrefix("全部") {
             return L10n.string(value)
         }
@@ -1633,7 +1903,11 @@ private struct FilterMenu: View {
 private struct ExerciseRow: View {
     let exercise: Exercise
 
+    @EnvironmentObject private var language: LanguageStore
+
     var body: some View {
+        let _ = language.language
+
         HStack(spacing: 14) {
             LocalExerciseImage(
                 path: exercise.image,

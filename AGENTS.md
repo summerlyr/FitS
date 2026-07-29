@@ -130,6 +130,9 @@ Preserve these behaviors unless the user explicitly requests a change.
   - both dots = a day containing both training types.
 - Selecting a marked day shows a workout summary, which opens workout detail.
 - Workout notes are intentionally free-form text for weight, reps, and sets.
+- Exercise rows in workout detail use the native persistent reorder handle and
+  can be reordered directly; the saved order is also used when copying or
+  sharing the workout.
 - Dataset exercises in the `cardio` category use a structured duration in
   minutes in addition to free-form notes for distance, pace, or resistance.
 - FitS built-in cardio activities use IDs prefixed with `fits-activity-`. They
@@ -141,6 +144,10 @@ Preserve these behaviors unless the user explicitly requests a change.
   photos.
 - Workout detail can be shared as a generated long image containing its summary,
   exercise notes, and attached photos.
+- Settings, opened from the top-right of each primary tab screen, can export
+  favorites, workout entries, and workout photos as one versioned JSON backup.
+  Import validates the file and replaces current workouts, favorites, and photos
+  only after confirmation; bundled exercise data and media are not included.
 - `删除训练` deletes the whole workout session for that date, including photos,
   after confirmation. Individual exercise entries still have their own delete
   action.
@@ -179,7 +186,8 @@ For exercise terminology:
 - Workout entries and photo metadata are JSON-encoded into `UserDefaults`.
 - Workout photo files live under Application Support/`TrainingPhotos`.
 - The app is local-only; uninstalling it removes user data.
-- There is no schema migration, cloud sync, or export/restore flow yet.
+- There is no cloud sync. Manual JSON export and overwrite-style restore,
+  including workout photos, are available from Settings on each primary screen.
 
 Be careful when changing persisted models. Adding non-optional `Codable` fields
 can make existing saved workout data fail to decode. If the model changes,

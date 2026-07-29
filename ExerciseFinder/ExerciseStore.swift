@@ -61,6 +61,11 @@ final class FavoritesStore: ObservableObject {
 
         UserDefaults.standard.set(Array(exerciseIDs), forKey: defaultsKey)
     }
+
+    func replace(with exerciseIDs: Set<String>) {
+        self.exerciseIDs = exerciseIDs
+        UserDefaults.standard.set(Array(exerciseIDs), forKey: defaultsKey)
+    }
 }
 
 struct TrainingEntry: Codable, Identifiable, Hashable {
@@ -150,6 +155,41 @@ final class TrainingStore: ObservableObject {
 
     func delete(_ entry: TrainingEntry) {
         entries.removeAll { $0.id == entry.id }
+        save()
+    }
+
+    func moveEntries(
+        on date: Date,
+        fromOffsets: IndexSet,
+        toOffset: Int
+    ) {
+        let calendar = Calendar.current
+        var sessionEntries = entries.filter {
+            calendar.isDate($0.date, inSameDayAs: date)
+        }
+        sessionEntries.move(fromOffsets: fromOffsets, toOffset: toOffset)
+
+        let orderingBase = calendar.startOfDay(for: date).addingTimeInterval(12 * 60 * 60)
+        let reorderedDates = Dictionary(uniqueKeysWithValues: sessionEntries.enumerated().map {
+            index, entry in
+            (entry.id, orderingBase.addingTimeInterval(Double(sessionEntries.count - index)))
+        })
+
+        entries = entries.map { entry in
+            guard let reorderedDate = reorderedDates[entry.id] else {
+                return entry
+            }
+
+            return TrainingEntry(
+                id: entry.id,
+                exerciseID: entry.exerciseID,
+                exerciseName: entry.exerciseName,
+                date: reorderedDate,
+                notes: entry.notes,
+                cardioDurationMinutes: entry.cardioDurationMinutes
+            )
+        }
+        entries.sort { $0.date > $1.date }
         save()
     }
 
@@ -272,6 +312,21 @@ final class TrainingStore: ObservableObject {
         photosDirectory.appending(path: photo.fileName)
     }
 
+    func backupPhotos() throws -> [FitSBackupPhoto] {
+        try photos.map { photo in
+            do {
+                return FitSBackupPhoto(
+                    id: photo.id,
+                    date: photo.date,
+                    fileName: photo.fileName,
+                    data: try Data(contentsOf: url(for: photo), options: .mappedIfSafe)
+                )
+            } catch {
+                throw FitSBackupError.photoUnavailable(photo.fileName)
+            }
+        }
+    }
+
     @discardableResult
     func delete(_ photo: TrainingPhoto) -> Bool {
         let photoURL = url(for: photo)
@@ -286,6 +341,85 @@ final class TrainingStore: ObservableObject {
         } catch {
             return false
         }
+    }
+
+    func restore(from backup: FitSBackup) throws {
+        let entryIDs = backup.trainingEntries.map(\.id)
+        guard Set(entryIDs).count == entryIDs.count else {
+            throw FitSBackupError.invalidContents
+        }
+
+        if backup.includesPhotos {
+            try restorePhotos(from: backup.trainingPhotos)
+        }
+
+        entries = backup.trainingEntries.sorted { $0.date > $1.date }
+        save()
+    }
+
+    private func restorePhotos(from backupPhotos: [FitSBackupPhoto]) throws {
+        let photoIDs = backupPhotos.map(\.id)
+        let fileNames = backupPhotos.map(\.fileName)
+        guard Set(photoIDs).count == photoIDs.count,
+              Set(fileNames).count == fileNames.count,
+              backupPhotos.allSatisfy({ photo in
+                  photo.fileName == URL(fileURLWithPath: photo.fileName).lastPathComponent
+                      && !photo.fileName.isEmpty
+                      && !photo.data.isEmpty
+                      && CGImageSourceCreateWithData(photo.data as CFData, nil) != nil
+              }) else {
+            throw FitSBackupError.invalidContents
+        }
+
+        let fileManager = FileManager.default
+        let parentDirectory = photosDirectory.deletingLastPathComponent()
+        let stagingDirectory = parentDirectory.appending(
+            path: "TrainingPhotos-Restore-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        let rollbackDirectory = parentDirectory.appending(
+            path: "TrainingPhotos-Rollback-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+
+        do {
+            try fileManager.createDirectory(
+                at: stagingDirectory,
+                withIntermediateDirectories: true
+            )
+            for photo in backupPhotos {
+                try photo.data.write(
+                    to: stagingDirectory.appending(path: photo.fileName),
+                    options: .atomic
+                )
+            }
+
+            let hadExistingPhotos = fileManager.fileExists(atPath: photosDirectory.path)
+            if hadExistingPhotos {
+                try fileManager.moveItem(at: photosDirectory, to: rollbackDirectory)
+            }
+
+            do {
+                try fileManager.moveItem(at: stagingDirectory, to: photosDirectory)
+            } catch {
+                if hadExistingPhotos {
+                    try? fileManager.moveItem(at: rollbackDirectory, to: photosDirectory)
+                }
+                throw error
+            }
+
+            if hadExistingPhotos {
+                try? fileManager.removeItem(at: rollbackDirectory)
+            }
+        } catch {
+            try? fileManager.removeItem(at: stagingDirectory)
+            throw error
+        }
+
+        photos = backupPhotos
+            .map { TrainingPhoto(id: $0.id, date: $0.date, fileName: $0.fileName) }
+            .sorted { $0.date > $1.date }
+        savePhotos()
     }
 
     private func save() {
@@ -318,6 +452,107 @@ final class TrainingStore: ObservableObject {
         }
 
         return UIImage(cgImage: image).jpegData(compressionQuality: 0.82)
+    }
+}
+
+struct FitSBackupPhoto: Codable, Identifiable, Hashable {
+    let id: UUID
+    let date: Date
+    let fileName: String
+    let data: Data
+}
+
+struct FitSBackup: Codable {
+    static let currentVersion = 2
+    static let maximumFileSize = 250 * 1_024 * 1_024
+
+    let version: Int
+    let exportedAt: Date
+    let favoriteExerciseIDs: [String]
+    let trainingEntries: [TrainingEntry]
+    let trainingPhotos: [FitSBackupPhoto]
+
+    var includesPhotos: Bool {
+        version >= 2
+    }
+
+    init(
+        favoriteExerciseIDs: [String],
+        trainingEntries: [TrainingEntry],
+        trainingPhotos: [FitSBackupPhoto]
+    ) {
+        version = Self.currentVersion
+        exportedAt = .now
+        self.favoriteExerciseIDs = favoriteExerciseIDs
+        self.trainingEntries = trainingEntries
+        self.trainingPhotos = trainingPhotos
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case version
+        case exportedAt
+        case favoriteExerciseIDs
+        case trainingEntries
+        case trainingPhotos
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        version = try container.decode(Int.self, forKey: .version)
+        guard (1...Self.currentVersion).contains(version) else {
+            throw FitSBackupError.unsupportedVersion
+        }
+        exportedAt = try container.decode(Date.self, forKey: .exportedAt)
+        favoriteExerciseIDs = try container.decode([String].self, forKey: .favoriteExerciseIDs)
+        trainingEntries = try container.decode([TrainingEntry].self, forKey: .trainingEntries)
+        if version >= 2 {
+            trainingPhotos = try container.decode(
+                [FitSBackupPhoto].self,
+                forKey: .trainingPhotos
+            )
+        } else {
+            trainingPhotos = []
+        }
+    }
+
+    func encoded() throws -> Data {
+        let data = try JSONEncoder().encode(self)
+        guard data.count <= Self.maximumFileSize else {
+            throw FitSBackupError.fileTooLarge
+        }
+        return data
+    }
+
+    static func decode(from data: Data) throws -> FitSBackup {
+        guard data.count <= maximumFileSize else {
+            throw FitSBackupError.fileTooLarge
+        }
+
+        let backup = try JSONDecoder().decode(FitSBackup.self, from: data)
+        guard (1...currentVersion).contains(backup.version) else {
+            throw FitSBackupError.unsupportedVersion
+        }
+        return backup
+    }
+}
+
+enum FitSBackupError: LocalizedError {
+    case fileTooLarge
+    case invalidContents
+    case photoUnavailable(String)
+    case unsupportedVersion
+
+    var errorDescription: String? {
+        switch self {
+        case .fileTooLarge:
+            L10n.string("备份文件过大。")
+        case .invalidContents:
+            L10n.string("备份文件内容无效或已损坏。")
+        case .photoUnavailable(let fileName):
+            L10n.format("无法读取训练图片 %@，备份未导出。", fileName)
+        case .unsupportedVersion:
+            L10n.string("此备份来自不受支持的 FitS 版本。")
+        }
     }
 }
 

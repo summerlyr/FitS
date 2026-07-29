@@ -99,7 +99,6 @@ struct ExerciseFinderApp: App {
             .environmentObject(training)
             .environmentObject(language)
             .environment(\.locale, language.language.locale)
-            .id(language.language.rawValue)
         }
     }
 
