@@ -1328,6 +1328,20 @@ private struct TrainingSessionDetailView: View {
                         selectedExercise = entryExercise
                     }
                 )
+                .contextMenu {
+                    Button {
+                        entryToEdit = entry
+                    } label: {
+                        Label("编辑", systemImage: "pencil")
+                    }
+
+                    Button(role: .destructive) {
+                        entryToDelete = entry
+                        isShowingDeleteConfirmation = true
+                    } label: {
+                        Label("删除", systemImage: "trash")
+                    }
+                }
                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                     Button(role: .destructive) {
                         entryToDelete = entry
