@@ -12,7 +12,7 @@
 "无法加载数据" = "Unable to Load Data";
 "找不到内置的动作数据库。" = "The built-in exercise database could not be found.";
 
-"今日训练" = "Today's Workout";
+"记录训练" = "Log Workout";
 "取消收藏" = "Remove Favorite";
 "清除筛选" = "Clear Filters";
 "暂无收藏" = "No Favorites";
@@ -37,11 +37,11 @@
 "训练记录" = "Workouts";
 "重量、次数和组数暂时作为自由文本记录。" = "Record weight, reps, and sets as free-form notes.";
 "训练日期" = "Workout Date";
-"加入今日训练" = "Add to Today's Workout";
+"加入训练" = "Add to Workout";
 "取消" = "Cancel";
 "加入" = "Add";
 "还没有训练记录" = "No Workouts Yet";
-"从动作或收藏列表左滑，将动作加入今日训练。" = "Swipe left on an exercise or favorite to add it to today's workout.";
+"从动作或收藏列表左滑，将动作加入训练。" = "Swipe left on an exercise or favorite to add it to a workout.";
 "删除" = "Delete";
 "删除训练？" = "Delete Workout?";
 "删除训练" = "Delete Workout";
@@ -56,6 +56,7 @@
 "%ld 个" = "%ld";
 "训练图片" = "Workout Photos";
 "编辑" = "Edit";
+"查看动作详情" = "View Exercise Details";
 "训练详情" = "Workout Details";
 "分享训练长图" = "Share Workout Image";
 "将整次训练复制到今天" = "Copy entire workout to today";

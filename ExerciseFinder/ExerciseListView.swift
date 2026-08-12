@@ -126,7 +126,7 @@ struct ExerciseListView: View {
                         Button {
                             exerciseToLog = exercise
                         } label: {
-                            Label("今日训练", systemImage: "calendar.badge.plus")
+                            Label("记录训练", systemImage: "calendar.badge.plus")
                         }
                         .tint(.blue)
 
@@ -318,6 +318,7 @@ private struct AddTrainingEntrySheet: View {
     @EnvironmentObject private var training: TrainingStore
     @State private var notes = ""
     @State private var cardioDurationMinutes = 30
+    @State private var date = Date.now
 
     var body: some View {
         NavigationStack {
@@ -367,10 +368,14 @@ private struct AddTrainingEntrySheet: View {
                 }
 
                 Section("训练日期") {
-                    Text(L10n.formattedDate(.now))
+                    DatePicker(
+                        "日期",
+                        selection: $date,
+                        displayedComponents: .date
+                    )
                 }
             }
-            .navigationTitle("加入今日训练")
+            .navigationTitle("加入训练")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -384,7 +389,8 @@ private struct AddTrainingEntrySheet: View {
                         training.add(
                             exercise,
                             notes: notes,
-                            cardioDurationMinutes: exercise.isCardio ? cardioDurationMinutes : nil
+                            cardioDurationMinutes: exercise.isCardio ? cardioDurationMinutes : nil,
+                            date: date
                         )
                         dismiss()
                     }
@@ -596,7 +602,7 @@ struct TrainingView: View {
         ContentUnavailableView(
             "还没有训练记录",
             systemImage: "calendar.badge.plus",
-            description: Text("从动作或收藏列表左滑，将动作加入今日训练。")
+            description: Text("从动作或收藏列表左滑，将动作加入训练。")
         )
     }
 
@@ -1324,15 +1330,17 @@ private struct TrainingSessionDetailView: View {
                 TrainingEntryRow(
                     entry: entry,
                     exercise: entryExercise,
-                    onSelect: {
-                        selectedExercise = entryExercise
+                    onEdit: {
+                        entryToEdit = entry
                     }
                 )
                 .contextMenu {
-                    Button {
-                        entryToEdit = entry
-                    } label: {
-                        Label("编辑", systemImage: "pencil")
+                    if let entryExercise {
+                        Button {
+                            selectedExercise = entryExercise
+                        } label: {
+                            Label("查看动作详情", systemImage: "info.circle")
+                        }
                     }
 
                     Button(role: .destructive) {
@@ -1701,18 +1709,14 @@ private struct TrainingPhotoImage: View {
 private struct TrainingEntryRow: View {
     let entry: TrainingEntry
     let exercise: Exercise?
-    let onSelect: () -> Void
+    let onEdit: () -> Void
 
     var body: some View {
-        if exercise != nil {
-            Button(action: onSelect) {
-                content
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-        } else {
+        Button(action: onEdit) {
             content
+                .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 
     private var content: some View {
