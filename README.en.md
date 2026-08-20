@@ -26,6 +26,7 @@ FitS is a local-first exercise browser and workout tracker built with SwiftUI. I
 - Discover alternatives based on target muscle, body part, and movement characteristics
 - Save favorites and use list swipe actions to favorite an exercise or add it to a workout on a selected date
 - Log exercises by date with free-form notes for weight, repetitions, and sets
+- Review every previous workout date and note for an exercise from its detail page
 - Reorder exercises, attach photos, duplicate an entire workout, or move a workout session to another date
 - Export an exercise detail page or workout record as a long image through the system share sheet
 - Open Settings from the top-right of any primary screen to export favorites, workout records, and workout photos as a JSON backup, then restore by replacing local data

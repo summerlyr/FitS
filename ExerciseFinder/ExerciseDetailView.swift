@@ -5,6 +5,7 @@ struct ExerciseDetailView: View {
     let exercise: Exercise
     @EnvironmentObject private var store: ExerciseStore
     @EnvironmentObject private var favorites: FavoritesStore
+    @EnvironmentObject private var training: TrainingStore
     @State private var language: DetailLanguage
     @State private var shareImage: UIImage?
 
@@ -52,6 +53,43 @@ struct ExerciseDetailView: View {
                                 .joined(separator: language.listSeparator)
                         )
                     }
+                }
+
+                if !trainingHistory.isEmpty {
+                    NavigationLink {
+                        ExerciseTrainingHistoryView(exercise: exercise)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.title3)
+                                .foregroundStyle(.tint)
+                                .frame(width: 36, height: 36)
+                                .background(Color.accentColor.opacity(0.12), in: Circle())
+
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("训练历史")
+                                    .font(.headline)
+                                    .foregroundStyle(.primary)
+
+                                Text(L10n.format("%ld 条训练记录", trainingHistory.count))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(14)
+                        .background(
+                            Color(.secondarySystemBackground),
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -179,6 +217,12 @@ struct ExerciseDetailView: View {
         )
     }
 
+    private var trainingHistory: [TrainingEntry] {
+        training.entries
+            .filter { $0.exerciseID == exercise.id }
+            .sorted { $0.date > $1.date }
+    }
+
     private func alternativeScore(for candidate: Exercise) -> Int {
         var score = 0
 
@@ -232,6 +276,45 @@ struct ExerciseDetailView: View {
         renderer.proposedSize = ProposedViewSize(width: 390, height: nil)
         renderer.scale = 2
         return renderer.uiImage
+    }
+}
+
+private struct ExerciseTrainingHistoryView: View {
+    let exercise: Exercise
+
+    @EnvironmentObject private var training: TrainingStore
+
+    private var entries: [TrainingEntry] {
+        training.entries
+            .filter { $0.exerciseID == exercise.id }
+            .sorted { $0.date > $1.date }
+    }
+
+    var body: some View {
+        List(entries) { entry in
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(L10n.formattedDate(entry.date))
+                        .font(.headline)
+
+                    Spacer()
+
+                    if let minutes = entry.cardioDurationMinutes {
+                        Label(L10n.format("%ld 分钟", minutes), systemImage: "clock")
+                            .font(.subheadline)
+                            .foregroundStyle(.tint)
+                    }
+                }
+
+                Text(entry.notes.isEmpty ? L10n.string("无备注") : entry.notes)
+                    .foregroundStyle(entry.notes.isEmpty ? .tertiary : .primary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.vertical, 4)
+        }
+        .navigationTitle("训练历史")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
     }
 }
 

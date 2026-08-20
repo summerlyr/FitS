@@ -58,6 +58,9 @@
 "编辑" = "Edit";
 "查看动作详情" = "View Exercise Details";
 "训练详情" = "Workout Details";
+"训练历史" = "Workout History";
+"%ld 条训练记录" = "%ld workout entries";
+"无备注" = "No notes";
 "分享训练长图" = "Share Workout Image";
 "将整次训练复制到今天" = "Copy entire workout to today";
 "为这次训练添加图片" = "Add photos to this workout";
